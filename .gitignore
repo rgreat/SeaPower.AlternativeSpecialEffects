@@ -1,0 +1,7 @@
+bin/
+obj/
+out/
+*.user
+/com.rgreat.seapower.alternativespecialeffects.cfg
+/AlternativeSpecialEffects.trace.txt
+/LogOutput.txt
