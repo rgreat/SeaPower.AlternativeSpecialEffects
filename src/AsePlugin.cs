@@ -31,7 +31,7 @@ namespace AlternativeSpecialEffects
         static AsePlugin _inst;
         public static AsePlugin Instance { get { return _inst; } }
         static volatile bool Enabled;                   // ticked in the game's Mods menu (always true for a BepInEx/plugins copy)
-        static AsePlugin Active { get { return Enabled ? _inst : null; } }
+        internal static AsePlugin Active { get { return Enabled ? _inst : null; } }
         static bool _debug;
         static string _traceFile;
         bool _patchTried;
@@ -41,7 +41,7 @@ namespace AlternativeSpecialEffects
         public ConfigFile Cfg;
         internal ConfigEntry<string> _language;
         internal ConfigEntry<bool> _debugEntry, _flashLimit, _flashMissile, _fireFlicker, _optNormal, _optDayOnly, _flashMuzzle, _flashHit,
-                                   _mgBurstFix, _mgSoundLoop, _hitSoundFix, _smoke, _density, _hide3d, _gunHits, _raftLights;
+                                   _mgBurstFix, _mgSoundLoop, _hitSoundFix, _smoke, _density, _hide3d, _hideSubs, _gunHits, _raftLights;
         internal ConfigEntry<float> _flashPower, _firePower, _dayBright, _densityMin, _densityEnd, _smokeMod, _smokeSev, _bubbles;
         public static string UserDir { get; private set; }
         internal bool CfgIsNew;                         // the settings file did not exist: the old mods' values are taken over
@@ -136,6 +136,8 @@ namespace AlternativeSpecialEffects
                 "(the game never stops it while the wreck exists). Saves resources in long missions. 0 = never, as in the game.");
             _hide3d = Cfg.Bind("UI", "HideUnobservedTargets3D", false,
                 "Do not draw in the 3D view the targets of other sides that are not observed visually (known by radar, sonar or data only). Your own units are always drawn.");
+            _hideSubs = Cfg.Bind("UI", "HideUnobservedSubmarines3D", false,
+                "With HideUnobservedTargets3D on, submarines are hidden too. Off: submarines are always drawn (they are almost never seen visually). Only counts when HideUnobservedTargets3D is on.");
             _optNormal = Cfg.Bind("Optics", "BinocularsNormalView", true, "Binoculars at the maximum magnification start with the normal view (the game starts them with its night / thermal filter on). The game's filter key switches the filter on.");
             _optDayOnly = Cfg.Bind("Optics", "NormalViewDayOnly", true, "The normal view is the default only by day; at night the game's own default filter stays.");
             _mgBurstFix = Cfg.Bind("Guns", "MachineGunBurstFix", true, "Machine guns show their muzzle burst on every shot: a pooled burst effect that is still playing is restarted.");
@@ -147,7 +149,7 @@ namespace AlternativeSpecialEffects
 
             // the order of the window's fields is the table in SettingsWindow; this list is what it loads and saves
             foreach (var en in new ConfigEntryBase[] { _flashMuzzle, _flashHit, _flashMissile, _flashPower, _flashLimit, _dayBright, _fireFlicker, _firePower,
-                                                        _gunHits, _raftLights, _smoke, _density, _densityMin, _densityEnd, _smokeMod, _smokeSev, _bubbles, _hide3d, _optNormal, _optDayOnly,
+                                                        _gunHits, _raftLights, _smoke, _density, _densityMin, _densityEnd, _smokeMod, _smokeSev, _bubbles, _hide3d, _hideSubs, _optNormal, _optDayOnly,
                                                         _mgBurstFix, _mgSoundLoop, _hitSoundFix, _debugEntry, _language })
                 Entries.Add(en);
 
@@ -191,7 +193,7 @@ namespace AlternativeSpecialEffects
             FireSmoke.Trace = Trace; FireSmoke.Verbose = () => _debug;
             FireSmoke.IsEnabled = () => Enabled && _smoke.Value;
             FireSmoke.DensityOn = () => Enabled && _density.Value;
-            HideUnseen.Trace = Trace; HideUnseen.IsEnabled = () => Enabled && _hide3d.Value;
+            HideUnseen.Trace = Trace; HideUnseen.IsEnabled = () => Enabled && _hide3d.Value; HideUnseen.HideSubs = () => _hideSubs.Value;
             BubblesOff.Trace = Trace; BubblesOff.IsEnabled = () => Enabled && _bubbles.Value > 0f;
             BubblesOff.Minutes = () => Math.Max(0f, _bubbles.Value);
         }
@@ -204,7 +206,7 @@ namespace AlternativeSpecialEffects
             FireSmoke.EndOpacity = Pct(_densityEnd.Value, 0f, 100f);
             FireSmoke.ModerateFrom = Pct(_smokeMod.Value, 1f, 100f);
             FireSmoke.SevereFrom = Math.Max(FireSmoke.ModerateFrom, Pct(_smokeSev.Value, 1f, 100f));
-            try { if (!(Enabled && _hide3d.Value)) HideUnseen.RestoreAll(); } catch (Exception e) { Trace("RestoreAll: " + e.Message); }
+            try { if (!(Enabled && _hide3d.Value)) HideUnseen.RestoreAll(); else if (!_hideSubs.Value) HideUnseen.RestoreSubmarines(); } catch (Exception e) { Trace("RestoreAll: " + e.Message); }
         }
 
         // ------------------------------------------------------------ the .cfg changed outside the game

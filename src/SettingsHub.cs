@@ -116,6 +116,45 @@ namespace Rgreat.Hub
         public static void Install(Harmony harmony, Assembly game, Action<string> trace, Func<string> language)
         {
             _game = game; if (trace != null) _trace = trace; if (language != null) _language = language;
+            // Patching the menu classes at plugin start makes the runtime run their static constructors, which register Noesis properties before Noesis
+            // is ready: the game (the Release build) crashes natively. So the patches are made after the game's load screen has finished.
+            const BindingFlags any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            try
+            {
+                var ls = game.GetType("SeaPower.LoadScreen");
+                if (ls != null)
+                    foreach (var nt in ls.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic))
+                        if (nt.Name.StartsWith("<ExecuteLoadScreen>", StringComparison.Ordinal))
+                        {
+                            var mn = nt.GetMethod("MoveNext", any);
+                            if (mn != null) { harmony.Patch(mn, postfix: Hm("LoadScreenPostfix")); _harmony = harmony; Log("menu entries wait for the end of the load screen"); return; }
+                        }
+            }
+            catch (Exception e) { Log("load-screen hook failed: " + e.Message); }
+            Log("load screen not found: menu entries are installed now");
+            DoInstall(harmony);
+        }
+
+        static Harmony _harmony;
+        static bool _installed;
+
+        static void LoadScreenPostfix(bool __result)
+        {
+            if (__result || _installed) return;    // the iterator has not finished yet
+            _installed = true;
+            try
+            {
+                DoInstall(_harmony);
+                // the main menu may have been built already: it gets its button now
+                var menu = GameView("SeapowerUI.MainMenuView");
+                if (menu != null) MainMenuCtorPostfix(menu);
+            }
+            catch (Exception e) { Log("installing the menu entries failed: " + e); }
+        }
+
+        static void DoInstall(Harmony harmony)
+        {
+            var game = _game;
             const BindingFlags all = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
             var main = game.GetType("SeapowerUI.MainMenuView");
             var ctor = main == null ? null : main.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null);

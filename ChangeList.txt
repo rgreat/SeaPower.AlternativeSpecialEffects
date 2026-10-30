@@ -2,5 +2,9 @@
 - First release. Special effects of the 3D picture collected from Alternative Weapons Control (flashes, fire light, binoculars,
   machine gun and hit sound fixes), Alternative Damage Model (fire and smoke points, fire look by strength, sinking bubbles,
   hiding unseen targets) and rgreat cumulative pack (gun hit effects, life raft lights).
+- Hiding of unseen targets (HideUnobservedTargets3D) follows the game's own visual detection: wakes fade out, towed sonar cables are hidden,
+  the camera does not centre on or follow a hidden target and returns to it when it becomes visible.
+- HideUnobservedSubmarines3D: separate switch to hide submarines too (off by default).
+- Life raft lights blink.
 - GunHitEffects and LifeRaftLights have their own switches that work at once, in a mission too.
 - Settings window from the main menu and the pause menu (one shared entry for all of the author's mods); settings of the old mods are taken over on the first start.

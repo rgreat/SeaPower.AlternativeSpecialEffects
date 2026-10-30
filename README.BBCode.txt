@@ -25,14 +25,14 @@ Special effects of the 3D picture in one mod with its own settings window: light
 
 [h3]View and optics[/h3]
 [olist]
-[*][b]Red lights on life rafts[/b] (own switch, works at once).
+[*][b]Blinking red lights on life rafts[/b] (own switch, works at once).
 [*][b]Binoculars[/b] start in the normal view at maximum zoom, with no night or thermal filter by default (option: only by day).
-[*][b]Unobserved targets:[/b] targets of other sides that are not seen visually are not drawn in 3D (off by default).
+[*][b]Unobserved targets:[/b] targets of other sides that are not seen visually are not drawn in 3D, with their wakes (fading out by themselves) and sonar cables. The camera does not centre on or follow them and returns to the selected one when it becomes visible (off by default; submarines are included only with a separate option, also off).
 [/olist]
 
 [h3]Settings and languages[/h3]
 [olist]
-[*]Settings window in the game with tabs: Lights, Fires, World, Guns, Debug, Language. Opens from the main menu (under Mod Manager) and from the pause menu (Esc, under Options). With several of the author's mods installed there is one [b]Alternative Mods[/b] button that lists them.
+[*]Settings window in the game with tabs: Flashes, Fires, World, Guns, Debug, Language. Opens from the main menu (under Mod Manager) and from the pause menu (Esc, under Options). With several of the author's mods installed there is one [b]Alternative Mods[/b] button that lists them.
 [*]On the first start the values of the same options are taken from the old Alternative Weapons Control and Alternative Damage Model settings.
 [*]Localized into 9 languages (en, ru, cn, de, es, fr, ko, ja, vn). The [b]lang/<code>.ini[/b] files can be edited to translate or change texts.
 [/olist]

@@ -16,8 +16,8 @@ A Sea Power mod (BepInEx + Anchor Chain) that collects the special effects of th
 **Guns and view**
 - Machine gun burst and sound-loop fixes, gun hit sound fix.
 - Binoculars at maximum zoom start with the normal view.
-- Targets of other sides that are not seen visually are not drawn in 3D (off by default).
-- More visible gun hit effects for calibres from 37 mm up, and red lights on life rafts (each has its own switch and works at once).
+- Targets of other sides that are not seen visually are not drawn in 3D, with their wakes (fading out by themselves) and sonar cables. The camera does not centre on or follow them and returns to the selected one when it becomes visible (off by default). Submarines are included only with a separate option (also off).
+- More visible gun hit effects for calibres from 37 mm up, and blinking red lights on life rafts (each has its own switch and works at once).
 
 ## Settings
 

@@ -50,10 +50,9 @@ namespace AlternativeSpecialEffects
             Add(T1, "grp.flashes", "Effects/FlashPower", "Flash brightness", "x", Kind.Number, 0.1f, 0.1f, 5f);
             Add(T1, "grp.flashes", "Effects/FlashLimit", "Limit flash glare", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T1, "grp.flashes", "Effects/DayBrightness", "Flash and fire brightness by day", "x", Kind.Number, 0.05f, 0.1f, 1f);
-            Add(T1, "grp.hits", "Effects/GunHitEffects", "Spectacular gun hit effects", "", Kind.Bool, 0, 0, 0, "game: off");
-            Add(T1, "grp.hits", "Effects/LifeRaftLights", "Life raft lights", "", Kind.Bool, 0, 0, 0, "game: off");
-            Add(T1, "grp.fireLight", "Effects/FireFlicker", "Fire light flicker", "", Kind.Bool, 0, 0, 0, "game: off");
-            Add(T1, "grp.fireLight", "Effects/FireLightPower", "Fire light brightness", "x", Kind.Number, 0.1f, 0.1f, 10f);
+            Add(T1, "grp.rafts", "Effects/LifeRaftLights", "Life raft lights", "", Kind.Bool, 0, 0, 0, "game: off");
+            Add(T2, "grp.fireLight", "Effects/FireFlicker", "Fire light flicker", "", Kind.Bool, 0, 0, 0, "game: off");
+            Add(T2, "grp.fireLight", "Effects/FireLightPower", "Fire light brightness", "x", Kind.Number, 0.1f, 0.1f, 10f);
             Add(T2, "grp.smoke", "Effects/ExtraSmokeEmitters", "Fire and smoke points by ship length", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T2, "grp.smoke", "Effects/SmokeBySeverity", "Fire look by its strength", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T2, "grp.smoke", "Effects/SmokeStartOpacity", "Small fire smoke at the start", "% of the game's", Kind.Number, 5f, 0f, 100f);
@@ -62,8 +61,10 @@ namespace AlternativeSpecialEffects
             Add(T2, "grp.smoke", "Effects/SmokeSevereFrom", "Severe fire from strength", "% of maximum", Kind.Number, 5f, 1f, 100f);
             Add(T3, "grp.sinking", "Effects/BubblesStopMinutes", "Sinking bubbles stop after", "min · 0 = never", Kind.Number, 1f, 0f, 600f);
             Add(T3, "grp.view", "UI/HideUnobservedTargets3D", "Hide targets that are not seen in 3D", "", Kind.Bool, 0, 0, 0, "game: off");
+            Add(T3, "grp.view", "UI/HideUnobservedSubmarines3D", "Hide submarines too", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T3, "grp.binoculars", "Optics/BinocularsNormalView", "Normal view in binoculars at max zoom", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T3, "grp.binoculars", "Optics/NormalViewDayOnly", "Normal view only by day", "", Kind.Bool, 0, 0, 0, "game: off");
+            Add(T4, "grp.hits", "Effects/GunHitEffects", "Spectacular gun hit effects", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T4, "grp.tracers", "Guns/MachineGunBurstFix", "Machine gun tracers in the whole burst", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T4, "grp.tracers", "Guns/MachineGunSoundLoopFix", "Seamless machine gun sound", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T4, "grp.tracers", "Guns/HitSoundFix", "Always play gun hit sound", "", Kind.Bool, 0, 0, 0, "game: off");
