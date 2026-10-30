@@ -7,7 +7,8 @@ nuget.config                       empty NuGet source list (offline build)
 src/                               plugin sources (see DEVNOTES.md)
 Release/                           THE MOD: upload the contents of this folder
   _info.ini  AlternativeSpecialEffects.dll  thumbnail.jpg  lang/*.ini
-  ammunition.fix/  vessels.fix/  vessels/     data patches (#!extend), see DEVNOTES.md
+  hit_effects.txt                       gun hit effects (read by the mod itself, not a game ini)
+  vessels.fix/  vessels/                life raft lights (#!extend patches), see DEVNOTES.md
 ```
 In StreamingAssets the mod folder must be named `AlternativeSpecialEffects`: the game keeps the mod's tick in `usersettings.ini` by the folder name and the mod reads it.
 Do not put AnchorChain, BepInEx or 0Harmony dlls into the mod folder.
@@ -27,7 +28,7 @@ dotnet build -c Release -p:ManagedDir=<Sea Power_Data>/Managed -p:BepInExCore=<B
 6. Debug in the settings window writes `BepInEx/AlternativeSpecialEffects.trace.txt`.
 
 ## Publish
-Use the game's Workshop uploader on the contents of `Release`. Short texts (en/ru): `Release/_info.ini`. `thumbnail.jpg` is a placeholder - replace it.
+Use the game's Workshop uploader on the contents of `Release`. Short texts (en/ru): `Release/_info.ini`.
 
 ## Version
 `PluginVersion` in `src/AsePlugin.cs` and `<Version>` in the csproj - change both.

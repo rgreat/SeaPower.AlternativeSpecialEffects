@@ -47,7 +47,7 @@ namespace AlternativeSpecialEffects
             D("set.resizeTip", "Drag to resize");
             D("tabs.lights", "Lights"); D("tabs.fires", "Fires"); D("tabs.world", "Sinking and view"); D("tabs.guns", "Guns");
             D("tabs.debug", "Debug"); D("tabs.language", "Language");
-            D("grp.flashes", "Flashes"); D("grp.fireLight", "Fire light"); D("grp.smoke", "Fire and smoke"); D("grp.sinking", "Sinking");
+            D("grp.flashes", "Flashes"); D("grp.hits", "Hits and rafts"); D("grp.fireLight", "Fire light"); D("grp.smoke", "Fire and smoke"); D("grp.sinking", "Sinking");
             D("grp.view", "3D view"); D("grp.binoculars", "Binoculars"); D("grp.tracers", "Tracers and sound");
             D("grp.diagnostics", "Diagnostics"); D("grp.language", "Language");
             D("lbl.Effects/MuzzleFlashLight", "Light flash when guns fire");
@@ -74,6 +74,8 @@ namespace AlternativeSpecialEffects
             D("lbl.Effects/SmokeSevereFrom", "Severe fire from strength"); D("unit.Effects/SmokeSevereFrom", "% of maximum");
             D("lbl.Effects/BubblesStopMinutes", "Sinking bubbles stop after"); D("unit.Effects/BubblesStopMinutes", "min · 0 = never");
             D("lbl.UI/HideUnobservedTargets3D", "Hide targets that are not seen in 3D");
+            D("lbl.Effects/GunHitEffects", "Spectacular gun hit effects");
+            D("lbl.Effects/LifeRaftLights", "Life raft lights");
             D("unit.x", "x");
         }
 

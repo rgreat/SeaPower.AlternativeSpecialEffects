@@ -16,7 +16,9 @@ namespace AlternativeSpecialEffects
         static readonly string[] Old =
         {
             Path.Combine("AlternativeWeaponsControl", "AlternativeWeaponsControl.cfg"),
+            // the settings folder of Alternative Damage Model was renamed; both may exist - the later file wins, so the new name goes last
             Path.Combine("AdvancedDamageControl", "AlternativeDamageModel.cfg"),
+            Path.Combine("AlternativeDamageControl", "AlternativeDamageModel.cfg"),
         };
 
         public static void FromOldMods(AsePlugin p)

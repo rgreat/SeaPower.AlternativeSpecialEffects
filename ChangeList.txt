@@ -2,4 +2,5 @@
 - First release. Special effects of the 3D picture collected from Alternative Weapons Control (flashes, fire light, binoculars,
   machine gun and hit sound fixes), Alternative Damage Model (fire and smoke points, fire look by strength, sinking bubbles,
   hiding unseen targets) and rgreat cumulative pack (gun hit effects, life raft lights).
-- Settings window from the main menu and the pause menu; settings of the old mods are taken over on the first start.
+- GunHitEffects and LifeRaftLights have their own switches that work at once, in a mission too.
+- Settings window from the main menu and the pause menu (one shared entry for all of the author's mods); settings of the old mods are taken over on the first start.

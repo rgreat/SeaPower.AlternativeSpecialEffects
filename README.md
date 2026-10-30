@@ -17,11 +17,11 @@ A Sea Power mod (BepInEx + Anchor Chain) that collects the special effects of th
 - Machine gun burst and sound-loop fixes, gun hit sound fix.
 - Binoculars at maximum zoom start with the normal view.
 - Targets of other sides that are not seen visually are not drawn in 3D (off by default).
-- More visible gun hit effects for calibres from 37 mm up, and red lights on life rafts (data files).
+- More visible gun hit effects for calibres from 37 mm up, and red lights on life rafts (each has its own switch and works at once).
 
 ## Settings
 
-A **Special Effects** button in the main menu (under Mod Manager) and in the pause menu (Esc, under Options) opens the settings window.
+A settings button in the main menu (under Mod Manager) and in the pause menu (Esc, under Options) opens the settings window. With several of the author's mods installed there is one **Alternative Mods** button that lists them.
 The file is `Sea Power_Data/StreamingAssets/user/AlternativeSpecialEffects/AlternativeSpecialEffects.cfg`; changes made to it
 while the game runs are picked up. On the first start the values of the same options are taken from the old
 Alternative Weapons Control and Alternative Damage Model settings.
@@ -30,6 +30,6 @@ Alternative Weapons Control and Alternative Damage Model settings.
 
 Subscribe in the Steam Workshop (needs Anchor Chain) or copy the contents of `Release` to
 `Sea Power_Data/StreamingAssets/AlternativeSpecialEffects/` and tick the mod in the Mods menu.
-Compatible with Sea Power 0.8.6 / 0.8.7.
+Supports Sea Power version 0.8.7 (Release and Stable Beta).
 
 Source: https://github.com/rgreat/SeaPower.AlternativeSpecialEffects

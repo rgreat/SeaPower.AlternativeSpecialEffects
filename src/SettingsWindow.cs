@@ -50,6 +50,8 @@ namespace AlternativeSpecialEffects
             Add(T1, "grp.flashes", "Effects/FlashPower", "Flash brightness", "x", Kind.Number, 0.1f, 0.1f, 5f);
             Add(T1, "grp.flashes", "Effects/FlashLimit", "Limit flash glare", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T1, "grp.flashes", "Effects/DayBrightness", "Flash and fire brightness by day", "x", Kind.Number, 0.05f, 0.1f, 1f);
+            Add(T1, "grp.hits", "Effects/GunHitEffects", "Spectacular gun hit effects", "", Kind.Bool, 0, 0, 0, "game: off");
+            Add(T1, "grp.hits", "Effects/LifeRaftLights", "Life raft lights", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T1, "grp.fireLight", "Effects/FireFlicker", "Fire light flicker", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T1, "grp.fireLight", "Effects/FireLightPower", "Fire light brightness", "x", Kind.Number, 0.1f, 0.1f, 10f);
             Add(T2, "grp.smoke", "Effects/ExtraSmokeEmitters", "Fire and smoke points by ship length", "", Kind.Bool, 0, 0, 0, "game: off");

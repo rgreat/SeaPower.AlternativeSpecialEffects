@@ -41,7 +41,7 @@ namespace AlternativeSpecialEffects
         public ConfigFile Cfg;
         internal ConfigEntry<string> _language;
         internal ConfigEntry<bool> _debugEntry, _flashLimit, _flashMissile, _fireFlicker, _optNormal, _optDayOnly, _flashMuzzle, _flashHit,
-                                   _mgBurstFix, _mgSoundLoop, _hitSoundFix, _smoke, _density, _hide3d;
+                                   _mgBurstFix, _mgSoundLoop, _hitSoundFix, _smoke, _density, _hide3d, _gunHits, _raftLights;
         internal ConfigEntry<float> _flashPower, _firePower, _dayBright, _densityMin, _densityEnd, _smokeMod, _smokeSev, _bubbles;
         public static string UserDir { get; private set; }
         internal bool CfgIsNew;                         // the settings file did not exist: the old mods' values are taken over
@@ -126,6 +126,11 @@ namespace AlternativeSpecialEffects
             _densityEnd = Cfg.Bind("Effects", "SmokeEndOpacity", 100f, "Small fire: smoke opacity of new particles at SmokeModerateFrom, % of the game's; between - evenly by the fire's strength.");
             _smokeMod = Cfg.Bind("Effects", "SmokeModerateFrom", 50f, "The moderate fire's look from this strength, % of the fire's maximum (the game: 25%).");
             _smokeSev = Cfg.Bind("Effects", "SmokeSevereFrom", 90f, "The severe fire's look from this strength, % of the fire's maximum (the game: 50%).");
+            _gunHits = Cfg.Bind("Effects", "GunHitEffects", true,
+                "More visible and spectacular hits of gun shells (calibres from 37 mm up): the hit effects of 47 gun ammunition files are replaced (hit_effects.txt of the mod, from the rgreat cumulative pack). " +
+                "Off = the game's own hit effects. Takes effect at once; a shell already in the air keeps the effect it had.");
+            _raftLights = Cfg.Bind("Effects", "LifeRaftLights", true,
+                "A blinking red light on life rafts (visible at night). Off = rafts without lights. Takes effect at once.");
             _bubbles = Cfg.Bind("Effects", "BubblesStopMinutes", 10f,
                 "Minutes (game time, so time compression counts) after a ship starts to sink, when its sinking-bubbles effect stops emitting " +
                 "(the game never stops it while the wreck exists). Saves resources in long missions. 0 = never, as in the game.");
@@ -142,7 +147,7 @@ namespace AlternativeSpecialEffects
 
             // the order of the window's fields is the table in SettingsWindow; this list is what it loads and saves
             foreach (var en in new ConfigEntryBase[] { _flashMuzzle, _flashHit, _flashMissile, _flashPower, _flashLimit, _dayBright, _fireFlicker, _firePower,
-                                                        _smoke, _density, _densityMin, _densityEnd, _smokeMod, _smokeSev, _bubbles, _hide3d, _optNormal, _optDayOnly,
+                                                        _gunHits, _raftLights, _smoke, _density, _densityMin, _densityEnd, _smokeMod, _smokeSev, _bubbles, _hide3d, _optNormal, _optDayOnly,
                                                         _mgBurstFix, _mgSoundLoop, _hitSoundFix, _debugEntry, _language })
                 Entries.Add(en);
 
@@ -181,6 +186,8 @@ namespace AlternativeSpecialEffects
 
         void WireModules()
         {
+            HitEffects.Trace = Trace; HitEffects.Want = () => Enabled && _gunHits.Value;
+            RaftLights.Trace = Trace; RaftLights.Want = () => Enabled && _raftLights.Value;
             FireSmoke.Trace = Trace; FireSmoke.Verbose = () => _debug;
             FireSmoke.IsEnabled = () => Enabled && _smoke.Value;
             FireSmoke.DensityOn = () => Enabled && _density.Value;
@@ -192,6 +199,7 @@ namespace AlternativeSpecialEffects
         /// <summary>Settings (or the Mods tick) changed: the values the modules read as plain numbers, and the effects that must be undone.</summary>
         void ApplySettings()
         {
+            HitEffects.Sync(); RaftLights.Sync();
             FireSmoke.StartOpacity = Pct(_densityMin.Value, 0f, 100f);
             FireSmoke.EndOpacity = Pct(_densityEnd.Value, 0f, 100f);
             FireSmoke.ModerateFrom = Pct(_smokeMod.Value, 1f, 100f);
@@ -286,6 +294,8 @@ namespace AlternativeSpecialEffects
             const BindingFlags all = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
             try { HookFireFlicker(harmony, asm); } catch (Exception e) { Warn("Fire flicker failed: " + e.Message); }
             try { HookOptics(harmony, asm); } catch (Exception e) { Warn("Binocular view failed: " + e.Message); }
+            try { if (!HitEffects.Init(harmony, asm)) Warn("Gun hit effects: game members not found; the game's own hit effects stay."); } catch (Exception e) { Warn("Gun hit effects failed: " + e.Message); }
+            try { if (!RaftLights.Init(harmony, asm)) Warn("Life raft lights: game members not found; the lights cannot be switched."); } catch (Exception e) { Warn("Life raft lights failed: " + e.Message); }
             try { HookEffectsGuns(harmony, asm); } catch (Exception e) { Warn("Gun effects failed: " + e.Message); }
             try { if (!BubblesOff.Init(harmony, asm)) Warn("Sinking bubbles: game members not found; they are not stopped."); } catch (Exception e) { Warn("Sinking bubbles failed: " + e.Message); }
             try { if (!HideUnseen.Init(harmony, asm)) Warn("Hide unobserved targets: game members not found."); } catch (Exception e) { Warn("Hide unobserved targets failed: " + e.Message); }
@@ -304,7 +314,13 @@ namespace AlternativeSpecialEffects
                 else Warn("Fire smoke: game members not found; the game's three points and stages are used.");
             }
             catch (Exception e) { Warn("Fire smoke hooks failed: " + e.Message); Trace(e.ToString()); }
-            try { HookMenus(harmony, asm); } catch (Exception e) { Warn("Menu buttons failed: " + e.Message); Trace(e.ToString()); }
+            try
+            {
+                Rgreat.Hub.SettingsHub.Register("alternative-special-effects", () => Loc.T("menu.button"), PluginVersion, 40,
+                    anchor => SettingsWindow.Open(anchor as Noesis.UIElement, null), () => Enabled);
+                Rgreat.Hub.SettingsHub.Install(harmony, asm, Trace, () => Loc.Language);
+            }
+            catch (Exception e) { Warn("Settings menu entry failed: " + e.Message); Trace(e.ToString()); }
             try
             {
                 var fm = asm.GetType("SeaPower.FileManager");
