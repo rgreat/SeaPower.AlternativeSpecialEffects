@@ -45,7 +45,7 @@ namespace AlternativeSpecialEffects
             D("set.gameLang", "the game's language");
             D("set.resetTip", "Back to the default");
             D("set.resizeTip", "Drag to resize");
-            D("tabs.lights", "Flashes"); D("tabs.fires", "Fires"); D("tabs.world", "Sinking and view"); D("tabs.guns", "Guns");
+            D("tabs.lights", "Lights"); D("tabs.fires", "Fires and Smoke"); D("tabs.world", "Sinking and view"); D("tabs.guns", "Guns");
             D("tabs.debug", "Debug"); D("tabs.language", "Language");
             D("grp.flashes", "Flashes"); D("grp.hits", "Hit effects"); D("grp.rafts", "Life rafts"); D("grp.fireLight", "Fire light"); D("grp.smoke", "Fire and smoke"); D("grp.sinking", "Sinking");
             D("grp.view", "3D view"); D("grp.binoculars", "Binoculars"); D("grp.tracers", "Tracers and sound");
@@ -72,6 +72,10 @@ namespace AlternativeSpecialEffects
             D("lbl.Effects/SmokeEndOpacity", "Small fire smoke at the moderate stage"); D("unit.Effects/SmokeEndOpacity", "% of the game's");
             D("lbl.Effects/SmokeModerateFrom", "Moderate fire from strength"); D("unit.Effects/SmokeModerateFrom", "% of maximum");
             D("lbl.Effects/SmokeSevereFrom", "Severe fire from strength"); D("unit.Effects/SmokeSevereFrom", "% of maximum");
+            D("lbl.Effects/SmokeFireShare", "Animation part with flames"); D("unit.Effects/SmokeFireShare", "% of its length");
+            D("lbl.Effects/SmokeSortFix", "Smoke columns overlap in the right order");
+            D("lbl.Effects/SmokeDensityFactor", "Fire and smoke density"); D("unit.Effects/SmokeDensityFactor", "times");
+            D("lbl.Effects/SmokeLifetimeFactor", "Smoke lasts longer"); D("unit.Effects/SmokeLifetimeFactor", "times");
             D("lbl.Effects/BubblesStopMinutes", "Sinking bubbles stop after"); D("unit.Effects/BubblesStopMinutes", "min · 0 = never");
             D("lbl.UI/HideUnobservedTargets3D", "Hide targets that are not seen in 3D");
             D("lbl.UI/HideUnobservedSubmarines3D", "Hide submarines too");

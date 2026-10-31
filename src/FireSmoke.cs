@@ -25,6 +25,9 @@ namespace AlternativeSpecialEffects
     static class FireSmoke
     {
         public static Func<bool> IsEnabled = () => false;
+        public static Func<bool> SortFix = () => false;       // [Effects] SmokeSortFix
+        public static Func<float> DensityFactor = () => 1f;   // [Effects] SmokeDensityFactor
+        public static Func<float> LifeFactor = () => 1f;     // [Effects] SmokeLifetimeFactor
         public static Func<bool> DensityOn = () => false;   // [Effects] SmokeBySeverity
         public static float StartOpacity = 0.1f;              // [Effects] SmokeStartOpacity: the small fire's smoke as the fire starts
         public static float EndOpacity = 1f;                // [Effects] SmokeEndOpacity: the small fire's smoke at ModerateFrom
@@ -159,6 +162,7 @@ namespace AlternativeSpecialEffects
                     int st = sc == null ? 0 : Convert.ToInt32(_fireState.GetValue(sc, null));
                     if (st != w.States[i]) { changed |= w.States[i] >= 0; w.States[i] = st; }
                 }
+                ProlongAll(comp);
                 bool density = DensityOn();
                 if (density)
                 {
@@ -182,9 +186,244 @@ namespace AlternativeSpecialEffects
                     }
                     if (_dimmed) ResetLooks();
                 }
+                ApplyPending(comp);
                 if (Verbose()) Probe(comp, sys);
             }
             catch (Exception e) { Trace("FireSmoke.Tick: " + e.Message); }
+        }
+
+        /// <summary>
+        /// A new fire effect of a ship that already has others (after a saved game is loaded all of them are made at once and would animate
+        /// identically): its particles get their own random seed and its animation starts at a random moment of the first life of a particle.
+        /// </summary>
+        public static void Scatter(object comp, object fireEffect)
+        {
+            if (comp == null || fireEffect == null) return;
+            bool others = false;
+            foreach (var f in new[] { _small, _moderate, _severe })
+            {
+                var arr = f.GetValue(comp) as Array;
+                if (arr != null) foreach (var fe in arr) if (fe != null && !ReferenceEquals(fe, fireEffect)) others = true;
+            }
+            if (!others) return;
+            if (_fePs2 == null) _fePs2 = fireEffect.GetType().GetField("_fireEffectPS", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var root = _fePs2 == null ? null : _fePs2.GetValue(fireEffect) as Component;
+            if (root == null) return;
+            var tPs = root.GetType();
+            var auto = tPs.GetProperty("useAutoRandomSeed"); var seed = tPs.GetProperty("randomSeed");
+            var main = tPs.GetProperty("main") == null ? null : tPs.GetProperty("main").GetValue(root, null);
+            var life = main == null ? null : main.GetType().GetProperty("startLifetimeMultiplier");
+            if (seed != null) seed.SetValue(root, (uint)UnityEngine.Random.Range(1, int.MaxValue), null);
+            if (auto != null) auto.SetValue(root, true, null);
+            // the start moment is set at the next Tick, after the smoke's look by the fire's strength has been applied: the particles made by
+            // the pre-run must already have it
+            Pending.Add(fireEffect, new Pend { T = life == null ? 0f : Convert.ToSingle(life.GetValue(main, null)) * UnityEngine.Random.value });
+        }
+
+        sealed class Pend { public float T; }
+        static readonly ConditionalWeakTable<object, Pend> Pending = new ConditionalWeakTable<object, Pend>();
+        static MethodInfo _simulate, _play; static PropertyInfo _isPlaying;
+
+        /// <summary>Tick: the effects waiting for their random start moment are run up to it (after Density).</summary>
+        static void ApplyPending(object comp)
+        {
+            foreach (var f in new[] { _small, _moderate, _severe })
+            {
+                var arr = f.GetValue(comp) as Array;
+                if (arr == null) continue;
+                foreach (var fe in arr)
+                {
+                    Pend p;
+                    if (fe == null || !Pending.TryGetValue(fe, out p)) continue;
+                    if (_isPlaying == null) _isPlaying = fe.GetType().GetProperty("IsPlaying", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (_isPlaying != null && !(bool)_isPlaying.GetValue(fe, null)) continue;   // not burning now: when it is
+                    Pending.Remove(fe);
+                    if (_fePs2 == null) _fePs2 = fe.GetType().GetField("_fireEffectPS", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    var root = _fePs2 == null ? null : _fePs2.GetValue(fe) as Component;
+                    if (root == null || p.T <= 0f) continue;
+                    var tPs = root.GetType();
+                    if (_simulate == null) { _simulate = tPs.GetMethod("Simulate", new[] { typeof(float), typeof(bool), typeof(bool), typeof(bool) }); _play = tPs.GetMethod("Play", Type.EmptyTypes); }
+                    if (_simulate == null || _play == null) continue;
+                    _simulate.Invoke(root, new object[] { p.T, true, true, true });
+                    _play.Invoke(root, null);   // Simulate leaves the system paused
+                    if (Verbose()) Trace("fire scatter: '" + root.gameObject.name + "' starts " + p.T.ToString("0.0", CultureInfo.InvariantCulture) + " s in");
+                }
+            }
+        }
+
+        /// <summary>Every fire effect of a ship, burning or not: the lifetime settings are applied to it (new settings reach burning ships at once).</summary>
+        static void ProlongAll(object comp)
+        {
+            var cam = Camera.main; bool sort = SortFix() && cam != null;
+            foreach (var f in new[] { _small, _moderate, _severe })
+            {
+                var arr = f.GetValue(comp) as Array;
+                if (arr != null) foreach (var fe in arr) if (fe != null) { Prolong(fe); Sort(fe, cam, sort); }
+            }
+        }
+
+        sealed class SortSys { public Renderer R; public float Base, Now; }
+        static readonly ConditionalWeakTable<object, List<SortSys>> Sorts = new ConditionalWeakTable<object, List<SortSys>>();
+        static PropertyInfo _sFudge;
+
+        /// <summary>
+        /// Unity sorts particle systems among themselves by the distance to their bounds' centre, and a tall plume's centre is high up, far from the fire:
+        /// two columns overlap in the wrong order. The sorting bias (sortingFudge, a distance) of each system is set to the game's own plus the difference between
+        /// the distance to the fire point and to the bounds' centre, so the columns are ordered by where they stand. Once a second with the fire's update.
+        /// </summary>
+        static void Sort(object fe, Camera cam, bool on)
+        {
+            List<SortSys> l;
+            if (!Sorts.TryGetValue(fe, out l))
+            {
+                if (!on) return;
+                l = new List<SortSys>(); Sorts.Add(fe, l);
+                if (_fePs2 == null) _fePs2 = fe.GetType().GetField("_fireEffectPS", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                var root = _fePs2 == null ? null : _fePs2.GetValue(fe) as Component;
+                if (root == null) return;
+                foreach (var c in root.gameObject.GetComponentsInChildren(root.GetType(), true))
+                {
+                    string name = ((Component)c).name ?? "";
+                    if (!ReferenceEquals(c, root) && !name.StartsWith("shipfire", StringComparison.OrdinalIgnoreCase)) continue;   // flames: as they are
+                    var r = ((Component)c).GetComponent<Renderer>(); if (r == null) continue;
+                    if (_sFudge == null) _sFudge = r.GetType().GetProperty("sortingFudge");
+                    if (_sFudge == null) return;
+                    float b = Convert.ToSingle(_sFudge.GetValue(r, null));
+                    l.Add(new SortSys { R = r, Base = b, Now = b });
+                }
+            }
+            if (_sFudge == null || l.Count == 0) return;
+            var rootT = l[0].R == null ? null : l[0].R.transform;
+            float od = rootT == null ? 0f : (rootT.position - cam.transform.position).magnitude;
+            foreach (var s in l)
+            {
+                if (s.R == null) continue;
+                float want = on ? s.Base + (od - (s.R.bounds.center - cam.transform.position).magnitude) : s.Base;
+                if (Math.Abs(want - s.Now) < 0.05f) continue;
+                s.Now = want; _sFudge.SetValue(s.R, want, null);
+            }
+        }
+
+        // ------------------------------------------------------------ smoke that lasts longer
+
+        static PropertyInfo _lMain, _lLife, _lMax, _lEm, _lRate;
+        public static float FireShare = 0.5f;   // [Effects] SmokeFireShare: the first part of the sprite animation has the fire in it, the rest only smoke
+        static readonly string[] OverLife = { "textureSheetAnimation" };   // only the picture is re-timed: movement, size and colour stay as the game made them
+
+        sealed class Sys { public object Ps; public bool Smoke, SmokeOnly; public float BaseRate; public float BaseLife; public int BaseMax; public Dictionary<string, AnimationCurve> Curves = new Dictionary<string, AnimationCurve>(); }
+        sealed class LifeState { public float K = -1f, Share = -1f, Dens = -1f; public List<Sys> S = new List<Sys>(); }
+        static readonly ConditionalWeakTable<object, LifeState> Lives = new ConditionalWeakTable<object, LifeState>();
+
+        /// <summary>
+        /// A fire effect (new or already burning, once a second from Tick): only the smoke part of the sprite animation is stretched. The sprites of the
+        /// fire system carry the fire and the smoke in one animation (the fire is gone after SmokeFireShare of it): that part runs at the game's
+        /// speed, the rest SmokeLifetimeFactor times slower - the start lifetime is longer and the texture sheet animation is re-timed to match.
+        /// Movement is not touched. A smoke-only system (its material is a smoke one) is stretched whole. The rate stays the game's.
+        /// Everything is computed from the values as the game made them, so a changed setting is applied at once to burning ships too
+        /// (particles already in the air keep their life; new ones follow the setting).
+        /// </summary>
+        public static void Prolong(object fireEffect)
+        {
+            if (fireEffect == null) return;
+            float k = Math.Max(1f, LifeFactor()), dens = Math.Max(0f, DensityFactor());
+            LifeState st;
+            if (!Lives.TryGetValue(fireEffect, out st))
+            {
+                if (k <= 1.001f && Math.Abs(dens - 1f) < 1e-3f) return;
+                st = new LifeState(); Lives.Add(fireEffect, st);
+                if (_fePs2 == null) _fePs2 = fireEffect.GetType().GetField("_fireEffectPS", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                var root = _fePs2 == null ? null : _fePs2.GetValue(fireEffect) as Component;
+                if (root == null) return;
+                var tPs = root.GetType();
+                if (_lMain == null)
+                {
+                    _lMain = tPs.GetProperty("main");
+                    var tMain = _lMain == null ? null : _lMain.PropertyType;
+                    _lLife = tMain == null ? null : tMain.GetProperty("startLifetimeMultiplier");
+                    _lMax = tMain == null ? null : tMain.GetProperty("maxParticles");
+                    _lEm = tPs.GetProperty("emission");
+                    _lRate = _lEm == null ? null : _lEm.PropertyType.GetProperty("rateOverTimeMultiplier");
+                }
+                if (_lLife == null || _lMax == null || _lRate == null) { Trace("FireSmoke: smoke lifetime members not found"); return; }
+                foreach (var c in root.gameObject.GetComponentsInChildren(tPs, true))
+                {
+                    string name = ((Component)c).name ?? "";
+                    bool smoke = ReferenceEquals(c, root) || name.StartsWith("shipfire", StringComparison.OrdinalIgnoreCase);   // the others are flames: their life is the game's
+                    var rend = ((Component)c).GetComponent<Renderer>();
+                    var mat = rend == null ? null : rend.sharedMaterial;
+                    var main = _lMain.GetValue(c, null);
+                    st.S.Add(new Sys { Ps = c, Smoke = smoke, BaseRate = Convert.ToSingle(_lRate.GetValue(_lEm.GetValue(c, null), null)), SmokeOnly = mat != null && mat.name.IndexOf("smoke", StringComparison.OrdinalIgnoreCase) >= 0,
+                                       BaseLife = Convert.ToSingle(_lLife.GetValue(main, null)), BaseMax = Convert.ToInt32(_lMax.GetValue(main, null)) });
+                }
+            }
+            float share = FireShare;
+            if (Math.Abs(st.K - k) < 1e-4f && Math.Abs(st.Share - share) < 1e-4f && Math.Abs(st.Dens - dens) < 1e-4f) return;
+            st.K = k; st.Share = share; st.Dens = dens;
+            var log = new System.Text.StringBuilder();
+            foreach (var sy in st.S)
+            {
+                var ps = (Component)sy.Ps;
+                if (ps == null) continue;
+                float whole = !sy.Smoke ? 1f : sy.SmokeOnly ? k : share + (1f - share) * k;   // the new lifetime / the game's
+                var main = _lMain.GetValue(ps, null);
+                if (sy.Smoke) _lLife.SetValue(main, sy.BaseLife * whole, null);
+                _lMax.SetValue(main, (int)Math.Min(100000f, sy.BaseMax * whole * Math.Max(1f, dens) + 1f), null);   // room for the particles, nothing else changes
+                _lRate.SetValue(_lEm.GetValue(ps, null), sy.BaseRate * dens, null);
+                int curves = 0;
+                if (sy.Smoke && !sy.SmokeOnly) foreach (var mn in OverLife) curves += Retime(ps, ps.GetType(), mn, share / whole, sy.Curves);
+                log.Append("\n  '").Append(ps.name).Append("' ").Append(sy.SmokeOnly ? "whole" : "second half").Append(" x").Append(whole.ToString("0.##", CultureInfo.InvariantCulture)).Append(", ").Append(curves).Append(" curves re-timed");
+            }
+            if (Verbose()) Trace("smoke lifetime x" + k.ToString("0.##", CultureInfo.InvariantCulture) + " from " + (share * 100f).ToString("0") + "%" + log);
+        }
+
+        /// <summary>The game's time t (0..1 of the life) -> the new one: the first part is squeezed to [0, a], the rest stretched over [a, 1].</summary>
+        static float Unwarp(float u, float a, float share) { return u <= a ? u * share / a : share + (u - a) * (1f - share) / (1f - a); }
+
+        /// <summary>Every over-lifetime curve of one module (if it is on) is re-timed from the game's own curve. Returns how many.</summary>
+        static int Retime(object ps, Type tPs, string moduleName, float a, Dictionary<string, AnimationCurve> bases)
+        {
+            var mp = tPs.GetProperty(moduleName);
+            if (mp == null) return 0;
+            var mod = mp.GetValue(ps, null);
+            var en = mod.GetType().GetProperty("enabled");
+            if (en == null || !(bool)en.GetValue(mod, null)) return 0;
+            int n = 0;
+            foreach (var pr in mod.GetType().GetProperties())
+            {
+                if (!pr.CanRead || !pr.CanWrite || pr.GetIndexParameters().Length != 0 || pr.Name.IndexOf("start", StringComparison.OrdinalIgnoreCase) >= 0 || pr.PropertyType.Name != "MinMaxCurve") continue;
+                var v = pr.GetValue(mod, null);
+                int mode = Convert.ToInt32(v.GetType().GetProperty("mode").GetValue(v, null));
+                bool changed = false;
+                if (mode == 1) changed = SetCurve(v, "curve", a, bases, moduleName + "." + pr.Name);
+                else if (mode == 2) { bool c1 = SetCurve(v, "curveMin", a, bases, moduleName + "." + pr.Name), c2 = SetCurve(v, "curveMax", a, bases, moduleName + "." + pr.Name); changed = c1 || c2; }
+                if (changed) { pr.SetValue(mod, v, null); n++; }
+            }
+            return n;
+        }
+
+        static bool SetCurve(object v, string prop, float a, Dictionary<string, AnimationCurve> bases, string key)
+        {
+            var p = v.GetType().GetProperty(prop); if (p == null) return false;
+            key += "." + prop;
+            AnimationCurve old;
+            if (!bases.TryGetValue(key, out old))
+            {
+                var cur = p.GetValue(v, null) as AnimationCurve;
+                if (cur == null || cur.length == 0) return false;
+                old = new AnimationCurve(cur.keys) { preWrapMode = cur.preWrapMode, postWrapMode = cur.postWrapMode };   // the game's, kept
+                bases[key] = old;
+            }
+            float share = FireShare;
+            var nc = new AnimationCurve { preWrapMode = old.preWrapMode, postWrapMode = old.postWrapMode };
+            const int N = 32;
+            var times = new List<float>();
+            for (int i = 0; i <= N; i++) times.Add(i / (float)N);
+            times.Add(a); times.Sort();
+            float last = -1f;
+            foreach (var u in times) { if (u - last < 1e-4f) continue; last = u; nc.AddKey(new Keyframe(u, old.Evaluate(Unwarp(u, a, share)))); }
+            for (int i = 0; i < nc.length; i++) nc.SmoothTangents(i, 0f);
+            p.SetValue(v, nc, null);
+            return true;
         }
 
         // ------------------------------------------------------------ smoke opacity by the fire's strength within its stage
@@ -530,12 +769,35 @@ namespace AlternativeSpecialEffects
                       .Append(" dist ").Append(P(em, "rateOverDistanceMultiplier")).Append(" bursts ").Append(P(em, "burstCount"))
                       .Append(" size ").Append(P(main, "startSizeMultiplier")).Append(" life ").Append(P(main, "startLifetimeMultiplier"))
                       .Append(" max ").Append(P(main, "maxParticles")).Append(" loop ").Append(P(main, "loop"));
+                    DumpMaterial(sb, ((Component)c).GetComponent<Renderer>());
                 }
                 foreach (var l in root.GetComponentsInChildren<Light>(true)) sb.Append("\n  Light '").Append(l.name).Append("' ").Append(l.intensity.ToString("0.##"));
                 if (tAudio != null) foreach (var a in root.GetComponentsInChildren(tAudio, true)) sb.Append("\n  Audio '").Append(((Component)a).name).Append("' ").Append(P(a, "volume"));
                 Trace(sb.ToString());
             }
             catch (Exception e) { Trace("FireSmoke.DumpEffect: " + e.Message); }
+        }
+
+        /// <summary>Debug: the material of a particle renderer - shader, queue and its colour / number properties (for the smoke colour question).</summary>
+        static void DumpMaterial(System.Text.StringBuilder sb, Renderer r)
+        {
+            try
+            {
+                var m = r == null ? null : r.sharedMaterial;
+                if (m == null || m.shader == null) return;
+                var sh = m.shader;
+                sb.Append("\n    renderer");
+                foreach (var pn0 in new[] { "renderMode", "sortMode", "sortingFudge", "sortingOrder", "sortingLayerID", "maxParticleSize", "alignment" })
+                { var pi = r.GetType().GetProperty(pn0); if (pi != null) { try { sb.Append(' ').Append(pn0).Append('=').Append(pi.GetValue(r, null)); } catch { } } }
+                sb.Append("\n    material '").Append(m.name).Append("' shader '").Append(sh.name).Append("' queue ").Append(m.renderQueue);
+                for (int i = 0; i < sh.GetPropertyCount(); i++)
+                {
+                    string pn = sh.GetPropertyName(i); var t = sh.GetPropertyType(i);
+                    if (t == UnityEngine.Rendering.ShaderPropertyType.Color) sb.Append(' ').Append(pn).Append('=').Append(m.GetColor(pn));
+                    else if (t == UnityEngine.Rendering.ShaderPropertyType.Float || t == UnityEngine.Rendering.ShaderPropertyType.Range) sb.Append(' ').Append(pn).Append('=').Append(m.GetFloat(pn).ToString("0.###", CultureInfo.InvariantCulture));
+                }
+            }
+            catch (Exception e) { sb.Append(" (material: ").Append(e.Message).Append(')'); }
         }
 
         static object P(object o, string name)

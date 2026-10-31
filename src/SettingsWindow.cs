@@ -50,15 +50,19 @@ namespace AlternativeSpecialEffects
             Add(T1, "grp.flashes", "Effects/FlashPower", "Flash brightness", "x", Kind.Number, 0.1f, 0.1f, 5f);
             Add(T1, "grp.flashes", "Effects/FlashLimit", "Limit flash glare", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T1, "grp.flashes", "Effects/DayBrightness", "Flash and fire brightness by day", "x", Kind.Number, 0.05f, 0.1f, 1f);
+            Add(T1, "grp.fireLight", "Effects/FireFlicker", "Fire light flicker", "", Kind.Bool, 0, 0, 0, "game: off");
+            Add(T1, "grp.fireLight", "Effects/FireLightPower", "Fire light brightness", "x", Kind.Number, 0.1f, 0.1f, 10f);
             Add(T1, "grp.rafts", "Effects/LifeRaftLights", "Life raft lights", "", Kind.Bool, 0, 0, 0, "game: off");
-            Add(T2, "grp.fireLight", "Effects/FireFlicker", "Fire light flicker", "", Kind.Bool, 0, 0, 0, "game: off");
-            Add(T2, "grp.fireLight", "Effects/FireLightPower", "Fire light brightness", "x", Kind.Number, 0.1f, 0.1f, 10f);
             Add(T2, "grp.smoke", "Effects/ExtraSmokeEmitters", "Fire and smoke points by ship length", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T2, "grp.smoke", "Effects/SmokeBySeverity", "Fire look by its strength", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T2, "grp.smoke", "Effects/SmokeStartOpacity", "Small fire smoke at the start", "% of the game's", Kind.Number, 5f, 0f, 100f);
             Add(T2, "grp.smoke", "Effects/SmokeEndOpacity", "Small fire smoke at the moderate stage", "% of the game's", Kind.Number, 5f, 0f, 100f);
             Add(T2, "grp.smoke", "Effects/SmokeModerateFrom", "Moderate fire from strength", "% of maximum", Kind.Number, 5f, 1f, 100f);
             Add(T2, "grp.smoke", "Effects/SmokeSevereFrom", "Severe fire from strength", "% of maximum", Kind.Number, 5f, 1f, 100f);
+            Add(T2, "grp.smoke", "Effects/SmokeSortFix", "Smoke columns overlap in the right order", "", Kind.Bool, 0, 0, 0, "game: off");
+            Add(T2, "grp.smoke", "Effects/SmokeDensityFactor", "Fire and smoke density", "times", Kind.Number, 0.1f, 0f, 100f);
+            Add(T2, "grp.smoke", "Effects/SmokeLifetimeFactor", "Smoke lasts longer", "times", Kind.Number, 0.5f, 1f, 100f);
+            Add(T2, "grp.smoke", "Effects/SmokeFireShare", "Animation part with flames", "% of its length", Kind.Number, 5f, 5f, 95f);
             Add(T3, "grp.sinking", "Effects/BubblesStopMinutes", "Sinking bubbles stop after", "min · 0 = never", Kind.Number, 1f, 0f, 600f);
             Add(T3, "grp.view", "UI/HideUnobservedTargets3D", "Hide targets that are not seen in 3D", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T3, "grp.view", "UI/HideUnobservedSubmarines3D", "Hide submarines too", "", Kind.Bool, 0, 0, 0, "game: off");
@@ -251,7 +255,7 @@ namespace AlternativeSpecialEffects
         }
 
         // size in UI units (the game's UI scale applies): everything fits at once; kept while the game runs, at most the screen less 40 px
-        const float WinW = 820f, WinH = 805f   /* screen pixels: converted to UI units at the first opening */;
+        const float WinW = 820f, WinH = 855f   /* screen pixels: converted to UI units at the first opening */;
         static float _winW = WinW, _winH = WinH;
         static int _place;
         static bool _sizedOnce;
@@ -284,7 +288,7 @@ namespace AlternativeSpecialEffects
             Grid.SetRow(_tabBar, 1); layout.Children.Add(_tabBar);
 
             _body = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0f, 6f, 0f, 6f) };
-            var scroll = new ScrollViewer { Content = _body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            var scroll = _scroll = new ScrollViewer { Content = _body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             var area = new Border { Child = scroll, Background = B(CCard), BorderBrush = B(CLine), BorderThickness = new Thickness(1f), Margin = new Thickness(12f, 4f, 12f, 0f) };
             Grid.SetRow(area, 2); layout.Children.Add(area);
 
@@ -606,16 +610,20 @@ namespace AlternativeSpecialEffects
             return cb;
         }
 
+        static ScrollViewer _scroll;
+        static float _keepScroll; static int _scrollBack;
+
         static void Commit(bool close)
         {
             Typing(false);
+            if (!close && _scroll != null) { _keepScroll = (float)_scroll.VerticalOffset; _scrollBack = 4; }   // Apply keeps the place in the list
             foreach (var f in Fields)
             {
                 var e = Entry(f.Key);
                 if (e == null || Same(Get(f), e.GetSerializedValue())) continue;
                 try { e.SetSerializedValue(Get(f)); } catch (Exception ex) { Trace(f.Key + ": " + ex.Message); }
             }
-            try { P.Cfg.Save(); P.RememberCfgStamp(); } catch (Exception ex) { Warn("Saving the settings failed: " + ex.Message); }
+            try { P.Cfg.Save(); } catch (Exception ex) { Warn("Saving the settings failed: " + ex.Message); }
             if (close) { Close(); return; }
             Load();
             Show();
@@ -627,6 +635,12 @@ namespace AlternativeSpecialEffects
         /// <summary>Called every frame: the delayed rebuild of the window after Apply (the texts follow the new language).</summary>
         public static void Tick()
         {
+            if (_scrollBack > 0 && _redraw <= 0)
+            {
+                // the new window is laid out a frame or two after it is built: the offset is put back until it holds
+                if (_scroll != null && IsOpen) { try { _scroll.ScrollToVerticalOffset(_keepScroll); } catch { } }
+                _scrollBack--;
+            }
             if (_redraw <= 0) return;
             if (--_redraw > 0) return;
             if (_root == null || !IsOpen) return;

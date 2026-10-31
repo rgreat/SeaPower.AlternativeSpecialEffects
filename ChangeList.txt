@@ -1,10 +1,10 @@
-1.0.0
-- First release. Special effects of the 3D picture collected from Alternative Weapons Control (flashes, fire light, binoculars,
-  machine gun and hit sound fixes), Alternative Damage Model (fire and smoke points, fire look by strength, sinking bubbles,
-  hiding unseen targets) and rgreat cumulative pack (gun hit effects, life raft lights).
-- Hiding of unseen targets (HideUnobservedTargets3D) follows the game's own visual detection: wakes fade out, towed sonar cables are hidden,
-  the camera does not centre on or follow a hidden target and returns to it when it becomes visible.
-- HideUnobservedSubmarines3D: separate switch to hide submarines too (off by default).
+1.1.0
+- Unseen targets (HideUnobservedTargets3D) follow the game's own visual detection and no longer blink. Their wakes fade out by themselves, towed and dipping sonar cables are hidden, the camera does not centre on or follow a hidden target and returns to it when it becomes visible.
+- HideUnobservedSubmarines3D: a separate switch to hide submarines too (off by default).
+- Fire smoke: SmokeLifetimeFactor (only the smoke part of the fire animation is slowed, default 10), SmokeFireShare (where the flames end in the animation), SmokeDensityFactor (number of emitted particles, default 2), SmokeSortFix (columns of smoke of one ship overlap in the right order). New settings reach burning ships at once.
+- Neighbouring fires of one ship no longer animate identically (e.g. after a saved game is loaded).
 - Life raft lights blink.
-- GunHitEffects and LifeRaftLights have their own switches that work at once, in a mission too.
-- Settings window from the main menu and the pause menu (one shared entry for all of the author's mods); settings of the old mods are taken over on the first start.
+- Settings window: tabs Lights and Fires and Smoke, Fire light moved to Lights, Apply keeps the scroll position, a little taller by default; the title shows the mod's own name.
+- The shared Alternative Mods entry is installed after the load screen (fixes the crash of the Release version of the game); its list opens in an overlay.
+- Settings of Alternative Damage Model are taken over from either AlternativeDamageControl or AdvancedDamageControl folder (the first has priority).
+- The .cfg is no longer polled while the game runs.

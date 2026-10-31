@@ -24,7 +24,7 @@ namespace AlternativeSpecialEffects
     {
         public const string PluginGuid = "com.rgreat.seapower.alternativespecialeffects";
         public const string PluginName = "Alternative Special Effects";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = "1.1.0";
 
         public static readonly string BuildId = ReadBuildId();
 
@@ -41,8 +41,8 @@ namespace AlternativeSpecialEffects
         public ConfigFile Cfg;
         internal ConfigEntry<string> _language;
         internal ConfigEntry<bool> _debugEntry, _flashLimit, _flashMissile, _fireFlicker, _optNormal, _optDayOnly, _flashMuzzle, _flashHit,
-                                   _mgBurstFix, _mgSoundLoop, _hitSoundFix, _smoke, _density, _hide3d, _hideSubs, _gunHits, _raftLights;
-        internal ConfigEntry<float> _flashPower, _firePower, _dayBright, _densityMin, _densityEnd, _smokeMod, _smokeSev, _bubbles;
+                                   _mgBurstFix, _mgSoundLoop, _hitSoundFix, _smoke, _density, _smokeSort, _hide3d, _hideSubs, _gunHits, _raftLights;
+        internal ConfigEntry<float> _flashPower, _firePower, _dayBright, _densityMin, _densityEnd, _smokeMod, _smokeSev, _smokeLife, _smokeShare, _smokeDens, _bubbles;
         public static string UserDir { get; private set; }
         internal bool CfgIsNew;                         // the settings file did not exist: the old mods' values are taken over
 
@@ -125,6 +125,10 @@ namespace AlternativeSpecialEffects
             _densityMin = Cfg.Bind("Effects", "SmokeStartOpacity", 10f, "Small fire: smoke opacity of new particles at 0% of the fire's maximum, % of the game's.");
             _densityEnd = Cfg.Bind("Effects", "SmokeEndOpacity", 100f, "Small fire: smoke opacity of new particles at SmokeModerateFrom, % of the game's; between - evenly by the fire's strength.");
             _smokeMod = Cfg.Bind("Effects", "SmokeModerateFrom", 50f, "The moderate fire's look from this strength, % of the fire's maximum (the game: 25%).");
+            _smokeLife = Cfg.Bind("Effects", "SmokeLifetimeFactor", 10f, "Ship fire smoke lasts this many times longer before it thins out (1 = as in the game).");
+            _smokeShare = Cfg.Bind("Effects", "SmokeFireShare", 50f, "Ship fire sprite animation: the first part, % of its length, has the flames in it and keeps the game's speed; only the rest (smoke) is slowed by SmokeLifetimeFactor.");
+            _smokeSort = Cfg.Bind("Effects", "SmokeSortFix", true, "Columns of smoke of one ship overlap in the right order: each smoke system is sorted by the distance to its fire point, not to its bounds' centre (a tall plume's centre is high up). Off = as in the game.");
+            _smokeDens = Cfg.Bind("Effects", "SmokeDensityFactor", 2f, "Density of the ship fire and smoke: the number of particles they emit is multiplied by this (1 = as in the game; default 2). Nothing else changes.");
             _smokeSev = Cfg.Bind("Effects", "SmokeSevereFrom", 90f, "The severe fire's look from this strength, % of the fire's maximum (the game: 50%).");
             _gunHits = Cfg.Bind("Effects", "GunHitEffects", true,
                 "More visible and spectacular hits of gun shells (calibres from 37 mm up): the hit effects of 47 gun ammunition files are replaced (hit_effects.txt of the mod, from the rgreat cumulative pack). " +
@@ -149,7 +153,7 @@ namespace AlternativeSpecialEffects
 
             // the order of the window's fields is the table in SettingsWindow; this list is what it loads and saves
             foreach (var en in new ConfigEntryBase[] { _flashMuzzle, _flashHit, _flashMissile, _flashPower, _flashLimit, _dayBright, _fireFlicker, _firePower,
-                                                        _gunHits, _raftLights, _smoke, _density, _densityMin, _densityEnd, _smokeMod, _smokeSev, _bubbles, _hide3d, _hideSubs, _optNormal, _optDayOnly,
+                                                        _gunHits, _raftLights, _smoke, _density, _smokeSort, _smokeDens, _densityMin, _densityEnd, _smokeMod, _smokeSev, _smokeLife, _smokeShare, _bubbles, _hide3d, _hideSubs, _optNormal, _optDayOnly,
                                                         _mgBurstFix, _mgSoundLoop, _hitSoundFix, _debugEntry, _language })
                 Entries.Add(en);
 
@@ -164,8 +168,7 @@ namespace AlternativeSpecialEffects
             Trace(PluginName + " " + PluginVersion + " build " + BuildId);
             SettingsWindow.Trace = Trace;
             SettingsWindow.Warn = Warn;
-            Cfg.SettingChanged += (s, e) => { _debug = _debugEntry.Value; ApplySettings(); RememberCfgStamp(); };
-            RememberCfgStamp();
+            Cfg.SettingChanged += (s, e) => { _debug = _debugEntry.Value; ApplySettings(); };
             WireModules();
             ApplySettings();
 
@@ -179,7 +182,6 @@ namespace AlternativeSpecialEffects
         {
             if (!_patchTried) TryPatch();
             try { SettingsWindow.Tick(); } catch (Exception e) { Trace("settings tick: " + e.Message); }
-            WatchConfigFile();
         }
 
         // ------------------------------------------------------------ modules and their settings
@@ -192,6 +194,9 @@ namespace AlternativeSpecialEffects
             RaftLights.Trace = Trace; RaftLights.Want = () => Enabled && _raftLights.Value;
             FireSmoke.Trace = Trace; FireSmoke.Verbose = () => _debug;
             FireSmoke.IsEnabled = () => Enabled && _smoke.Value;
+            FireSmoke.SortFix = () => Enabled && _smokeSort.Value;
+            FireSmoke.DensityFactor = () => Enabled ? Math.Max(0f, Math.Min(100f, _smokeDens.Value)) : 1f;
+            FireSmoke.LifeFactor = () => Enabled ? Math.Max(1f, Math.Min(100f, _smokeLife.Value)) : 1f;
             FireSmoke.DensityOn = () => Enabled && _density.Value;
             HideUnseen.Trace = Trace; HideUnseen.IsEnabled = () => Enabled && _hide3d.Value; HideUnseen.HideSubs = () => _hideSubs.Value;
             BubblesOff.Trace = Trace; BubblesOff.IsEnabled = () => Enabled && _bubbles.Value > 0f;
@@ -205,41 +210,9 @@ namespace AlternativeSpecialEffects
             FireSmoke.StartOpacity = Pct(_densityMin.Value, 0f, 100f);
             FireSmoke.EndOpacity = Pct(_densityEnd.Value, 0f, 100f);
             FireSmoke.ModerateFrom = Pct(_smokeMod.Value, 1f, 100f);
+            FireSmoke.FireShare = Pct(_smokeShare.Value, 5f, 95f);
             FireSmoke.SevereFrom = Math.Max(FireSmoke.ModerateFrom, Pct(_smokeSev.Value, 1f, 100f));
             try { if (!(Enabled && _hide3d.Value)) HideUnseen.RestoreAll(); else if (!_hideSubs.Value) HideUnseen.RestoreSubmarines(); } catch (Exception e) { Trace("RestoreAll: " + e.Message); }
-        }
-
-        // ------------------------------------------------------------ the .cfg changed outside the game
-
-        DateTime _cfgStamp; float _nextCfgCheck, _cfgChangedAt = -1f;
-
-        internal void RememberCfgStamp()
-        {
-            try { _cfgStamp = File.GetLastWriteTimeUtc(Cfg.ConfigFilePath); } catch { }
-            _cfgChangedAt = -1f;
-        }
-
-        void WatchConfigFile()
-        {
-            float now = UnityEngine.Time.unscaledTime;
-            if (now < _nextCfgCheck) return;
-            _nextCfgCheck = now + 1f;
-            try
-            {
-                if (!File.Exists(Cfg.ConfigFilePath)) return;
-                var t = File.GetLastWriteTimeUtc(Cfg.ConfigFilePath);
-                if (t == _cfgStamp)
-                {
-                    if (_cfgChangedAt >= 0f && now - _cfgChangedAt >= 0.5f)
-                    {
-                        _cfgChangedAt = -1f; Cfg.Reload(); _debug = _debugEntry.Value; ApplySettings(); SettingsWindow.Refresh();
-                        Say("Settings re-read from " + Cfg.ConfigFilePath);
-                    }
-                    return;
-                }
-                _cfgStamp = t; _cfgChangedAt = now;
-            }
-            catch (Exception e) { Trace("WatchConfigFile: " + e.Message); }
         }
 
         // ------------------------------------------------------------ the Mods menu tick
@@ -274,7 +247,11 @@ namespace AlternativeSpecialEffects
 
         static void SmokeInitPostfix(object __instance) { try { FireSmoke.AfterInit(__instance); } catch (Exception e) { Trace("SmokeInit: " + e.Message); } }
         static void SmokeFireStatePostfix(object __instance) { try { FireSmoke.AfterUpdateFireState(__instance); } catch (Exception e) { Trace("SmokeFireState: " + e.Message); } }
-        static void SmokeCreatePostfix(object fireEffect) { if (_debug) { try { FireSmoke.DumpEffect(fireEffect); } catch { } } }
+        static void SmokeCreatePostfix(object __instance, object fireEffect)
+        {
+            try { FireSmoke.Prolong(fireEffect); FireSmoke.Scatter(__instance, fireEffect); } catch (Exception e) { Trace("SmokeScatter: " + e.Message); }
+            if (_debug) { try { FireSmoke.DumpEffect(fireEffect); } catch { } }
+        }
         static IEnumerable<CodeInstruction> SmokeCreateTranspiler(IEnumerable<CodeInstruction> ins) { return FireSmoke.CreateFireEffectTranspiler(ins); }
 
         /// <summary>Once a second per ship (the game's own fixed update of its compartments): the look of the fire by its strength.</summary>

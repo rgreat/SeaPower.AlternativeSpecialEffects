@@ -1,4 +1,4 @@
-Version 1.0.0.
+Version 1.1.0.
 
 Special effects of the 3D picture in one mod with its own settings window: lights, fires, smoke, guns and optics. Takes over the effects that were spread over Alternative Weapons Control, Alternative Damage Model and the rgreat Cumulative Pack.
 
@@ -14,6 +14,10 @@ Special effects of the 3D picture in one mod with its own settings window: light
 [olist]
 [*][b]Fire and smoke points by ship length[/b] (1 / 2 / 3 / 5 instead of the game's three), each showing the fire of its own section.
 [*][b]The look of a fire by its strength:[/b] thresholds of small / moderate / severe fire and the smoke opacity are settings.
+[*][b]Fires of one ship differ:[/b] neighbouring fires get their own random seed and start moment, so they no longer animate identically (e.g. after a saved game is loaded).
+[*][b]Smoke order:[/b] columns of smoke of one ship overlap in the right order.
+[*][b]Fire and smoke density:[/b] a multiplier of the number of emitted particles (1 = as in the game).
+[*][b]Smoke lasts longer:[/b] the smoke part of the fire animation runs slower, so the smoke thins out later (10x by default, adjustable; the flames keep the game's speed).
 [*][b]Wreck effect timer:[/b] the effect of a sinking wreck stops after N minutes of game time, also after a saved game is loaded.
 [/olist]
 
@@ -32,7 +36,7 @@ Special effects of the 3D picture in one mod with its own settings window: light
 
 [h3]Settings and languages[/h3]
 [olist]
-[*]Settings window in the game with tabs: Flashes, Fires, World, Guns, Debug, Language. Opens from the main menu (under Mod Manager) and from the pause menu (Esc, under Options). With several of the author's mods installed there is one [b]Alternative Mods[/b] button that lists them.
+[*]Settings window in the game with tabs: Lights, Fires and Smoke, World, Guns, Debug, Language. Opens from the main menu (under Mod Manager) and from the pause menu (Esc, under Options). With several of the author's mods installed there is one [b]Alternative Mods[/b] button that lists them.
 [*]On the first start the values of the same options are taken from the old Alternative Weapons Control and Alternative Damage Model settings.
 [*]Localized into 9 languages (en, ru, cn, de, es, fr, ko, ja, vn). The [b]lang/<code>.ini[/b] files can be edited to translate or change texts.
 [/olist]
@@ -54,5 +58,5 @@ Special effects of the 3D picture in one mod with its own settings window: light
 [h1]Usage[/h1]
 [list]
 [*][b]Settings in the game:[/b] the Special Effects (or Alternative Mods) button in the main menu and in the pause menu.
-[*]The settings file is [b]user/AlternativeSpecialEffects/AlternativeSpecialEffects.cfg[/b]; changes made to it while the game runs are picked up.
+[*]The settings file is [b]user/AlternativeSpecialEffects/AlternativeSpecialEffects.cfg[/b].
 [/list]
