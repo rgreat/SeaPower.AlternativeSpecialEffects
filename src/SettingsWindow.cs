@@ -22,7 +22,7 @@ namespace AlternativeSpecialEffects
         public static Action<string> Trace = s => { };
         public static Action<string> Warn = s => { };
 
-        enum Kind { Number, Bool, Lang }
+        enum Kind { Number, Bool, Lang, Ships }
 
         sealed class Field
         {
@@ -34,6 +34,22 @@ namespace AlternativeSpecialEffects
         static readonly List<Field> Fields = new List<Field>();
         static readonly List<string> Tabs = new List<string>();
         static string _curTab = "tabs.lights";
+        // groups shown one at a time as sub-tabs inside their tab (the engine groups of the funnel smoke)
+        static readonly List<string> SubGroups = new List<string>();
+        static string _curSub;
+        static StackPanel _subBar, _pageBar;
+        // the pages of the Funnel Smoke tab (a strip above its groups): group -> page
+        static readonly List<string> Pages = new List<string> { "page.general", "page.engines", "page.ships", "page.nations" };
+        static string _curPage = "page.general";
+        const string FunnelTab = "tabs.funnel";
+
+        static string PageOf(string group)
+        {
+            if (group == "grp.funnel") return "page.general";
+            if (group == "grp.ships") return "page.ships";
+            if (group == "grp.nations") return "page.nations";
+            return SubGroups.Contains(group) ? "page.engines" : null;
+        }
 
         static void Add(string tab, string group, string key, string label, string unit, Kind kind, float step, float min, float max, string game = null)
         {
@@ -43,7 +59,7 @@ namespace AlternativeSpecialEffects
 
         static SettingsWindow()
         {
-            const string T1 = "tabs.lights", T2 = "tabs.fires", T3 = "tabs.world", T4 = "tabs.guns", T5 = "tabs.debug";
+            const string T1 = "tabs.lights", T2 = "tabs.fires", T3 = "tabs.world", T4 = "tabs.guns", T6 = "tabs.funnel", T5 = "tabs.debug";
             Add(T1, "grp.flashes", "Effects/MuzzleFlashLight", "Light flash when guns fire", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T1, "grp.flashes", "Effects/HitFlashLight", "Light flash when shells hit", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T1, "grp.flashes", "Effects/MissileLaunchFlashLight", "Light of missile boosters at launch", "", Kind.Bool, 0, 0, 0, "game: off");
@@ -59,20 +75,76 @@ namespace AlternativeSpecialEffects
             Add(T2, "grp.smoke", "Effects/SmokeEndOpacity", "Small fire smoke at the moderate stage", "% of the game's", Kind.Number, 5f, 0f, 100f);
             Add(T2, "grp.smoke", "Effects/SmokeModerateFrom", "Moderate fire from strength", "% of maximum", Kind.Number, 5f, 1f, 100f);
             Add(T2, "grp.smoke", "Effects/SmokeSevereFrom", "Severe fire from strength", "% of maximum", Kind.Number, 5f, 1f, 100f);
+            Add(T2, "grp.smoke", "Effects/SmokeAfterClouds", "Smoke and clouds in the right order", "", Kind.Bool, 0, 0, 0, "game: off");
+            Add(T2, "grp.smoke", "Effects/SmokeKeepOnStop", "Keep live smoke when the fire stage changes", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T2, "grp.smoke", "Effects/SmokeSortFix", "Smoke columns overlap in the right order", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T2, "grp.smoke", "Effects/SmokeDensityFactor", "Fire and smoke density", "times", Kind.Number, 0.1f, 0f, 100f);
             Add(T2, "grp.smoke", "Effects/SmokeLifetimeFactor", "Smoke lasts longer", "times", Kind.Number, 0.5f, 1f, 100f);
             Add(T2, "grp.smoke", "Effects/SmokeFireShare", "Animation part with flames", "% of its length", Kind.Number, 5f, 5f, 95f);
+            Add(T2, "grp.smoke", "Effects/SmokeSpreadGrowth", "Late smoke sprites grow", "% · 0 = game", Kind.Number, 10f, 0f, 200f);
+            Add(T2, "grp.smoke", "Effects/SmokeSpreadFade", "Growing sprites fade", "% · 0 = game", Kind.Number, 10f, 0f, 300f);
             Add(T3, "grp.sinking", "Effects/BubblesStopMinutes", "Sinking bubbles stop after", "min · 0 = never", Kind.Number, 1f, 0f, 600f);
             Add(T3, "grp.view", "UI/HideUnobservedTargets3D", "Hide targets that are not seen in 3D", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T3, "grp.view", "UI/HideUnobservedSubmarines3D", "Hide submarines too", "", Kind.Bool, 0, 0, 0, "game: off");
-            Add(T3, "grp.binoculars", "Optics/BinocularsNormalView", "Normal view in binoculars at max zoom", "", Kind.Bool, 0, 0, 0, "game: off");
-            Add(T3, "grp.binoculars", "Optics/NormalViewDayOnly", "Normal view only by day", "", Kind.Bool, 0, 0, 0, "game: off");
+            Add(T3, "grp.view", "Effects/ColourGradingNoDepthMask", "Colour grading without the depth mask", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T4, "grp.hits", "Effects/GunHitEffects", "Spectacular gun hit effects", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T4, "grp.tracers", "Guns/MachineGunBurstFix", "Machine gun tracers in the whole burst", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T4, "grp.tracers", "Guns/MachineGunSoundLoopFix", "Seamless machine gun sound", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T4, "grp.tracers", "Guns/HitSoundFix", "Always play gun hit sound", "", Kind.Bool, 0, 0, 0, "game: off");
+            Add(T6, "grp.funnel", "FunnelSmoke/Enabled", "Funnel smoke by engine type", "", Kind.Bool, 0, 0, 0, "game: off");
+            Add(T6, "grp.funnel", "FunnelSmoke/PowerExponent", "Smoke by engine power", "", Kind.Number, 0.1f, 0f, 2f);
+            Add(T6, "grp.funnel", "FunnelSmoke/SizeByPower", "Particle size by power", "", Kind.Number, 0.1f, 0f, 2f);
+            Add(T6, "grp.funnel", "FunnelSmoke/PowerReference", "Reference power", "hp", Kind.Number, 5000f, 1000f, 500000f);
+            Add(T6, "grp.funnel", "FunnelSmoke/GlobalThickness", "Funnel smoke thickness (all groups)", "x", Kind.Number, 0.5f, 0f, 50f);
+            Add(T6, "grp.funnel", "FunnelSmoke/GlobalDensity", "Funnel smoke particles (all groups)", "x", Kind.Number, 0.1f, 0f, 20f);
+            Add(T6, "grp.funnelDiesel", "FunnelSmoke/DieselDensityIdle", "DensityIdle", "x", Kind.Number, 0.1f, 0f, 20f);
+            Add(T6, "grp.funnelDiesel", "FunnelSmoke/DieselDensityFull", "DensityFull", "x", Kind.Number, 0.1f, 0f, 20f);
+            Add(T6, "grp.funnelDiesel", "FunnelSmoke/DieselLightIdle", "LightIdle", "% · 0 black, 100 white", Kind.Number, 5f, 0f, 100f);
+            Add(T6, "grp.funnelDiesel", "FunnelSmoke/DieselLightFull", "LightFull", "% · 0 black, 100 white", Kind.Number, 5f, 0f, 100f);
+            Add(T6, "grp.funnelDiesel", "FunnelSmoke/DieselThicknessIdle", "ThicknessIdle", "x", Kind.Number, 0.05f, 0f, 5f);
+            Add(T6, "grp.funnelDiesel", "FunnelSmoke/DieselThicknessFull", "ThicknessFull", "x", Kind.Number, 0.05f, 0f, 5f);
+            Add(T6, "grp.funnelDiesel", "FunnelSmoke/DieselLifeIdle", "LifeIdle", "x", Kind.Number, 0.05f, 0.01f, 1f);
+            Add(T6, "grp.funnelDiesel", "FunnelSmoke/DieselLifeFull", "LifeFull", "x", Kind.Number, 0.05f, 0.01f, 1f);
+            Add(T6, "grp.funnelSteam", "FunnelSmoke/SteamDensityIdle", "DensityIdle", "x", Kind.Number, 0.1f, 0f, 20f);
+            Add(T6, "grp.funnelSteam", "FunnelSmoke/SteamDensityFull", "DensityFull", "x", Kind.Number, 0.1f, 0f, 20f);
+            Add(T6, "grp.funnelSteam", "FunnelSmoke/SteamLightIdle", "LightIdle", "% · 0 black, 100 white", Kind.Number, 5f, 0f, 100f);
+            Add(T6, "grp.funnelSteam", "FunnelSmoke/SteamLightFull", "LightFull", "% · 0 black, 100 white", Kind.Number, 5f, 0f, 100f);
+            Add(T6, "grp.funnelSteam", "FunnelSmoke/SteamThicknessIdle", "ThicknessIdle", "x", Kind.Number, 0.05f, 0f, 5f);
+            Add(T6, "grp.funnelSteam", "FunnelSmoke/SteamThicknessFull", "ThicknessFull", "x", Kind.Number, 0.05f, 0f, 5f);
+            Add(T6, "grp.funnelSteam", "FunnelSmoke/SteamLifeIdle", "LifeIdle", "x", Kind.Number, 0.05f, 0.01f, 1f);
+            Add(T6, "grp.funnelSteam", "FunnelSmoke/SteamLifeFull", "LifeFull", "x", Kind.Number, 0.05f, 0.01f, 1f);
+            Add(T6, "grp.funnelGasTurbine", "FunnelSmoke/GasTurbineDensityIdle", "DensityIdle", "x", Kind.Number, 0.1f, 0f, 20f);
+            Add(T6, "grp.funnelGasTurbine", "FunnelSmoke/GasTurbineDensityFull", "DensityFull", "x", Kind.Number, 0.1f, 0f, 20f);
+            Add(T6, "grp.funnelGasTurbine", "FunnelSmoke/GasTurbineLightIdle", "LightIdle", "% · 0 black, 100 white", Kind.Number, 5f, 0f, 100f);
+            Add(T6, "grp.funnelGasTurbine", "FunnelSmoke/GasTurbineLightFull", "LightFull", "% · 0 black, 100 white", Kind.Number, 5f, 0f, 100f);
+            Add(T6, "grp.funnelGasTurbine", "FunnelSmoke/GasTurbineThicknessIdle", "ThicknessIdle", "x", Kind.Number, 0.05f, 0f, 5f);
+            Add(T6, "grp.funnelGasTurbine", "FunnelSmoke/GasTurbineThicknessFull", "ThicknessFull", "x", Kind.Number, 0.05f, 0f, 5f);
+            Add(T6, "grp.funnelGasTurbine", "FunnelSmoke/GasTurbineLifeIdle", "LifeIdle", "x", Kind.Number, 0.05f, 0.01f, 1f);
+            Add(T6, "grp.funnelGasTurbine", "FunnelSmoke/GasTurbineLifeFull", "LifeFull", "x", Kind.Number, 0.05f, 0.01f, 1f);
+            Add(T6, "grp.funnelNuclear", "FunnelSmoke/NuclearDensityIdle", "DensityIdle", "x", Kind.Number, 0.1f, 0f, 20f);
+            Add(T6, "grp.funnelNuclear", "FunnelSmoke/NuclearDensityFull", "DensityFull", "x", Kind.Number, 0.1f, 0f, 20f);
+            Add(T6, "grp.funnelNuclear", "FunnelSmoke/NuclearLightIdle", "LightIdle", "% · 0 black, 100 white", Kind.Number, 5f, 0f, 100f);
+            Add(T6, "grp.funnelNuclear", "FunnelSmoke/NuclearLightFull", "LightFull", "% · 0 black, 100 white", Kind.Number, 5f, 0f, 100f);
+            Add(T6, "grp.funnelNuclear", "FunnelSmoke/NuclearThicknessIdle", "ThicknessIdle", "x", Kind.Number, 0.05f, 0f, 5f);
+            Add(T6, "grp.funnelNuclear", "FunnelSmoke/NuclearThicknessFull", "ThicknessFull", "x", Kind.Number, 0.05f, 0f, 5f);
+            Add(T6, "grp.funnelNuclear", "FunnelSmoke/NuclearLifeIdle", "LifeIdle", "x", Kind.Number, 0.05f, 0.01f, 1f);
+            Add(T6, "grp.funnelNuclear", "FunnelSmoke/NuclearLifeFull", "LifeFull", "x", Kind.Number, 0.05f, 0.01f, 1f);
+            Add(T6, "grp.funnelCombined", "FunnelSmoke/CombinedDensityIdle", "DensityIdle", "x", Kind.Number, 0.1f, 0f, 20f);
+            Add(T6, "grp.funnelCombined", "FunnelSmoke/CombinedDensityFull", "DensityFull", "x", Kind.Number, 0.1f, 0f, 20f);
+            Add(T6, "grp.funnelCombined", "FunnelSmoke/CombinedLightIdle", "LightIdle", "% · 0 black, 100 white", Kind.Number, 5f, 0f, 100f);
+            Add(T6, "grp.funnelCombined", "FunnelSmoke/CombinedLightFull", "LightFull", "% · 0 black, 100 white", Kind.Number, 5f, 0f, 100f);
+            Add(T6, "grp.funnelCombined", "FunnelSmoke/CombinedThicknessIdle", "ThicknessIdle", "x", Kind.Number, 0.05f, 0f, 5f);
+            Add(T6, "grp.funnelCombined", "FunnelSmoke/CombinedThicknessFull", "ThicknessFull", "x", Kind.Number, 0.05f, 0f, 5f);
+            Add(T6, "grp.funnelCombined", "FunnelSmoke/CombinedLifeIdle", "LifeIdle", "x", Kind.Number, 0.05f, 0.01f, 1f);
+            Add(T6, "grp.funnelCombined", "FunnelSmoke/CombinedLifeFull", "LifeFull", "x", Kind.Number, 0.05f, 0.01f, 1f);
+            foreach (var g in new[] { "Diesel", "Steam", "GasTurbine", "Nuclear", "Combined" }) SubGroups.Add("grp.funnel" + g);
+            Add(T6, "grp.ships", "FunnelSmoke/Ships", "Ships", "", Kind.Ships, 0, 0, 0);
+            Add(T6, "grp.nations", "FunnelSmoke/Nations", "Nations", "", Kind.Ships, 0, 0, 0);
             Add(T5, "grp.diagnostics", "General/Debug", "Debug trace", "", Kind.Bool, 0, 0, 0);
+            Add(T5, "grp.diagnostics", "Debug/CamOffColor", "Off: Amplify Color (colour grading)", "", Kind.Bool, 0, 0, 0);
+            Add(T5, "grp.diagnostics", "Debug/CamOffUnderwater", "Off: Ceto water post effect", "", Kind.Bool, 0, 0, 0);
+            Add(T5, "grp.diagnostics", "Debug/CamOffOcclusion", "Off: Amplify Occlusion (shading)", "", Kind.Bool, 0, 0, 0);
+            Add(T5, "grp.diagnostics", "Debug/CamOffBloom", "Off: Amplify Bloom (glow)", "", Kind.Bool, 0, 0, 0);
             Add("tabs.language", "grp.language", "General/Language", "Language", "", Kind.Lang, 0, 0, 0);
         }
 
@@ -448,18 +520,96 @@ namespace AlternativeSpecialEffects
                     _tabBar.Children.Add(b);
                 }
             }
-            string group = null;
+            string group = null; bool subBar = false; _subBar = null; _pageBar = null;
+            if (_curTab == FunnelTab) _body.Children.Add(PageTabs());
+            if (_curSub == null || !SubGroups.Contains(_curSub)) _curSub = SubGroups.Count > 0 ? SubGroups[0] : null;
             foreach (var f in Fields)
             {
                 if (f.Tab != _curTab) continue;
+                if (_curTab == FunnelTab && PageOf(f.Group) != _curPage) continue;
+                if (SubGroups.Contains(f.Group))
+                {
+                    if (!subBar) { subBar = true; _body.Children.Add(SubTabs(_curTab)); }
+                    if (f.Group != _curSub) continue;
+                }
                 if (f.Group != group) { group = f.Group; _body.Children.Add(GroupTitle(Loc.T(group))); }
-                _body.Children.Add(Row(f));
+                if (f.Kind == Kind.Ships) ShipRows(f); else _body.Children.Add(Row(f));
             }
             UpdateStatus();
         }
 
+        /// <summary>The strip of the pages of the Funnel Smoke tab.</summary>
+        static FrameworkElement PageTabs()
+        {
+            _pageBar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(12f, 10f, 12f, 2f) };
+            foreach (var pg in Pages)
+            {
+                string page = pg; bool sel = page == _curPage;
+                var lab = new StackPanel { Orientation = Orientation.Horizontal };
+                if (PageChanged(page)) lab.Children.Add(new Ellipse { Width = 6f, Height = 6f, Fill = B(CWarn), Margin = new Thickness(0f, 0f, 6f, 0f), VerticalAlignment = VerticalAlignment.Center });
+                lab.Children.Add(Text(Loc.T(page), sel ? CText : CDim, 13f));
+                var b = new Border { Child = lab, Padding = new Thickness(12f, 5f, 12f, 5f), Margin = new Thickness(0f, 0f, 4f, 0f), Cursor = Cursors.Hand, Tag = page,
+                                     Background = B(sel ? CTitle : CCard), BorderBrush = B(sel ? CText : CLine), BorderThickness = new Thickness(1f), CornerRadius = new CornerRadius(3f) };
+                b.MouseLeftButtonUp += (o, e) => { _curPage = page; Show(); };
+                _pageBar.Children.Add(b);
+            }
+            return _pageBar;
+        }
+
+        static bool PageChanged(string page)
+        {
+            foreach (var f in Fields) if (f.Tab == FunnelTab && PageOf(f.Group) == page && !Same(Get(f), Saved(f))) return true;
+            return false;
+        }
+
+        /// <summary>The strip of sub-tabs (one per group in SubGroups that has fields on this tab), drawn above the group that is selected.</summary>
+        static FrameworkElement SubTabs(string tab)
+        {
+            _subBar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(12f, 10f, 12f, 4f) };
+            foreach (var g in SubGroups)
+            {
+                bool has = false; foreach (var f in Fields) if (f.Tab == tab && f.Group == g) { has = true; break; }
+                if (!has) continue;
+                string grp = g; bool sel = grp == _curSub;
+                var lab = new StackPanel { Orientation = Orientation.Horizontal };
+                if (GroupChanged(grp)) lab.Children.Add(new Ellipse { Width = 6f, Height = 6f, Fill = B(CWarn), Margin = new Thickness(0f, 0f, 6f, 0f), VerticalAlignment = VerticalAlignment.Center });
+                lab.Children.Add(Text(Loc.T(grp), sel ? CText : CDim, 12f));
+                var b = new Border { Child = lab, Padding = new Thickness(10f, 4f, 10f, 4f), Margin = new Thickness(0f, 0f, 4f, 0f), Cursor = Cursors.Hand, Tag = grp,
+                                     Background = B(sel ? CTitle : CCard), BorderBrush = B(CLine), BorderThickness = new Thickness(1f), CornerRadius = new CornerRadius(3f) };
+                b.MouseLeftButtonUp += (o, e) => { _curSub = grp; Show(); };
+                _subBar.Children.Add(b);
+            }
+            return _subBar;
+        }
+
+        static bool GroupChanged(string group)
+        {
+            foreach (var f in Fields) if (f.Group == group && !Same(Get(f), Saved(f))) return true;
+            return false;
+        }
+
         static void UpdateTabDots()
         {
+            if (_pageBar != null)
+                foreach (var c in _pageBar.Children)
+                {
+                    var b = c as Border; var sp = b == null ? null : b.Child as StackPanel; var g = b == null ? null : b.Tag as string;
+                    if (sp == null || g == null) continue;
+                    bool has = sp.Children.Count > 1, want = PageChanged(g);
+                    if (has == want) continue;
+                    if (want) sp.Children.Insert(0, new Ellipse { Width = 6f, Height = 6f, Fill = B(CWarn), Margin = new Thickness(0f, 0f, 6f, 0f), VerticalAlignment = VerticalAlignment.Center });
+                    else sp.Children.RemoveAt(0);
+                }
+            if (_subBar != null)
+                foreach (var c in _subBar.Children)
+                {
+                    var b = c as Border; var sp = b == null ? null : b.Child as StackPanel; var g = b == null ? null : b.Tag as string;
+                    if (sp == null || g == null) continue;
+                    bool has = sp.Children.Count > 1, want = GroupChanged(g);
+                    if (has == want) continue;
+                    if (want) sp.Children.Insert(0, new Ellipse { Width = 6f, Height = 6f, Fill = B(CWarn), Margin = new Thickness(0f, 0f, 6f, 0f), VerticalAlignment = VerticalAlignment.Center });
+                    else sp.Children.RemoveAt(0);
+                }
             if (_tabBar == null) return;
             int i = 0;
             foreach (var t in Tabs)
@@ -608,6 +758,129 @@ namespace AlternativeSpecialEffects
             };
             refresh = () => cb.SelectedIndex = index();
             return cb;
+        }
+
+        // ------------------------------------------------------------ single ships: multipliers of the funnel smoke ([FunnelSmoke] Ships)
+
+        static Grid ShipGrid()
+        {
+            var g = new Grid { Background = B(Color.FromArgb(0, 0, 0, 0)) };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1f, GridUnitType.Star), MinWidth = 210f });
+            for (int i = 0; i < 4; i++) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(122f) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30f) });
+            return g;
+        }
+
+        static void ShipHelp(Border outer, string title, string key)
+        {
+            outer.MouseEnter += (o, e) =>
+            {
+                outer.Background = B(CHl);
+                _help.Inlines.Clear();
+                var r = new Run(title); r.FontWeight = FontWeight.Bold; r.Foreground = B(CText);
+                _help.Inlines.Add(r);
+                _help.Inlines.Add(new Run(" - " + Loc.Or(key, "")));
+            };
+            outer.MouseLeave += (o, e) => outer.Background = B(Color.FromArgb(0, 0, 0, 0));
+        }
+
+        static void ShipRows(Field f)
+        {
+            bool nat = f.Key.EndsWith("Nations", StringComparison.OrdinalIgnoreCase);
+            Func<string, string> show = nat ? (Func<string, string>)ShipNames.NationDisplay : ShipNames.Display;
+            Func<string, string> toKey = nat ? (Func<string, string>)ShipNames.NationToKey : ShipNames.ToIni;
+            Func<string, int, List<string>> filter = nat ? (Func<string, int, List<string>>)ShipNames.NationFilter : ShipNames.Filter;
+            string helpKey = "help." + f.Key;
+            var list = ShipFunnel.Parse(Get(f));
+            Action save = () => { _work[f.Key] = ShipFunnel.Write(list); UpdateStatus(); UpdateTabDots(); };
+            string[] heads = { Loc.T("ships.particles"), Loc.T("ships.duration"), Loc.T("ships.lightness"), Loc.T("ships.thickness") };
+            if (list.Count > 0)
+            {
+                var hg = ShipGrid();
+                for (int c = 0; c < 4; c++) { var h = Text(heads[c], CDim, 11f); h.HorizontalAlignment = HorizontalAlignment.Center; Grid.SetColumn(h, c + 1); hg.Children.Add(h); }
+                _body.Children.Add(new Border { Child = hg, Padding = new Thickness(12f, 2f, 6f, 0f) });
+            }
+            foreach (var it0 in list)
+            {
+                var it = it0;
+                var g = ShipGrid();
+                var outer = new Border { Child = g, Padding = new Thickness(12f, 4f, 6f, 4f), Background = B(Color.FromArgb(0, 0, 0, 0)) };
+                var nm = Text(show(it.Ini), CText);
+                try { ToolTipService.SetToolTip(nm, it.Ini); } catch { }
+                g.Children.Add(nm);
+                Func<float, float, float, float, Func<float>, Action<float>, FrameworkElement> num = (step, min, max, cur, get, set) =>
+                {
+                    var sp = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+                    var box = Edit(cur.ToString("0.##", CultureInfo.InvariantCulture), 46f);
+                    Action<float> put = v =>
+                    {
+                        v = Math.Max(min, Math.Min(max, v));
+                        v = (float)Math.Round(v * 100f) / 100f;
+                        box.Text = v.ToString("0.##", CultureInfo.InvariantCulture);
+                        set(v); save();
+                    };
+                    var minus = new Button { Content = "−", Width = 24f, Height = 24f, Padding = new Thickness(0f) };
+                    var plus = new Button { Content = "+", Width = 24f, Height = 24f, Padding = new Thickness(0f) };
+                    minus.Click += (o, e) => put((float)Math.Round((Num(box.Text) - step) / step) * step);
+                    plus.Click += (o, e) => put((float)Math.Round((Num(box.Text) + step) / step) * step);
+                    Action typed = () => { float v; if (TryNum(box.Text, out v)) put(v); else box.Text = get().ToString("0.##", CultureInfo.InvariantCulture); };
+                    box.LostFocus += (o, e) => typed();
+                    box.KeyDown += (o, e) => { if (e.Key == Key.Return) { typed(); e.Handled = true; } };
+                    sp.Children.Add(minus); sp.Children.Add(box); sp.Children.Add(plus);
+                    return sp;
+                };
+                var e1 = num(0.1f, 0f, 10f, it.Particles, () => it.Particles, v => it.Particles = v);
+                var e2 = num(0.05f, 0.01f, 10f, it.Duration, () => it.Duration, v => it.Duration = v);
+                var e3 = num(0.05f, 0f, 10f, it.Lightness, () => it.Lightness, v => it.Lightness = v);
+                var e4 = num(0.05f, 0f, 10f, it.Thickness, () => it.Thickness, v => it.Thickness = v);
+                Grid.SetColumn(e1, 1); Grid.SetColumn(e2, 2); Grid.SetColumn(e3, 3); Grid.SetColumn(e4, 4);
+                g.Children.Add(e1); g.Children.Add(e2); g.Children.Add(e3); g.Children.Add(e4);
+                var rm = new Button { Content = Cross(8f), Width = 24f, Height = 22f, Padding = new Thickness(0f), HorizontalAlignment = HorizontalAlignment.Right,
+                                      HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center };
+                try { ToolTipService.SetToolTip(rm, Loc.T(nat ? "ships.removeNation" : "ships.remove")); } catch { }
+                rm.Click += (o, e) => { list.Remove(it); save(); Show(); };
+                Grid.SetColumn(rm, 5); g.Children.Add(rm);
+                ShipHelp(outer, show(it.Ini), helpKey);
+                _body.Children.Add(outer);
+            }
+            // add a ship: a drop-down of the game's ships by their names; typing filters it, any ini name can be typed too
+            var ag = new Grid();
+            ag.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            ag.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            ag.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1f, GridUnitType.Star) });
+            var aouter = new Border { Child = ag, Padding = new Thickness(12f, 8f, 6f, 8f) };
+            var nameBox = new ComboBox { IsEditable = true, Width = 230f, MinHeight = 24f, HorizontalAlignment = HorizontalAlignment.Left, StaysOpenOnEdit = true };
+            Action<string> fill = t0 => { nameBox.Items.Clear(); foreach (var n in filter(t0, 300)) nameBox.Items.Add(n); };
+            fill("");
+            string lastFilter = "";
+            nameBox.KeyUp += (o, e) =>
+            {
+                if (e.Key == Key.Return || e.Key == Key.Up || e.Key == Key.Down) return;
+                string t = nameBox.Text ?? "";
+                if (t == lastFilter) return;
+                lastFilter = t;
+                fill(t);
+                nameBox.Text = t;
+                try { var tb = nameBox.Template.FindName("PART_EditableTextBox", nameBox) as TextBox; if (tb != null) tb.CaretIndex = t.Length; } catch { }
+                nameBox.IsDropDownOpen = nameBox.Items.Count > 0 && t.Length > 0;
+            };
+            nameBox.GotFocus += (o, e) => Typing(true);
+            nameBox.LostFocus += (o, e) => Typing(false);
+            ag.Children.Add(nameBox);
+            var err = Text("", CWarn, 11f); err.Margin = new Thickness(8f, 0f, 0f, 0f);
+            var addB = new Button { Content = Loc.T(nat ? "ships.addNation" : "ships.add"), Padding = new Thickness(10f, 2f, 10f, 2f), Margin = new Thickness(8f, 0f, 0f, 0f), MinHeight = 24f };
+            addB.Click += (o, e) =>
+            {
+                string n = toKey((nameBox.SelectedItem as string ?? nameBox.Text ?? "").Trim());
+                if (!nat && n.EndsWith(".ini", StringComparison.OrdinalIgnoreCase)) n = n.Substring(0, n.Length - 4);
+                if (n.Length == 0 || n.IndexOfAny(new[] { ';', '=', ',', '\n' }) >= 0) { err.Text = Loc.T(nat ? "ships.pickNation" : "ships.pick"); return; }
+                if (!list.Exists(x => string.Equals(x.Ini, n, StringComparison.OrdinalIgnoreCase))) list.Add(new ShipFunnel.Item { Ini = n });
+                save(); Show();
+            };
+            Grid.SetColumn(addB, 1); ag.Children.Add(addB);
+            Grid.SetColumn(err, 2); ag.Children.Add(err);
+            ShipHelp(aouter, Loc.T(nat ? "ships.addNation" : "ships.add"), helpKey);
+            _body.Children.Add(aouter);
         }
 
         static ScrollViewer _scroll;

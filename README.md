@@ -11,15 +11,15 @@ A Sea Power mod (BepInEx + Anchor Chain) that collects the special effects of th
 **Fires and sinking**
 - Fire and smoke points by ship length (1 / 2 / 3 / 5 instead of the game's three), each showing its own section's fire.
 - The look of a fire by its strength (small / moderate / severe thresholds and smoke opacity are settings).
-- Neighbouring fires of one ship animate differently (random seed and start moment).
-- Columns of smoke of one ship overlap in the right order.
+- Funnel smoke of ships by engine type and load (Diesel, Steam, GasTurbine, Nuclear, Combined groups; each has its own editable density, lightness (black to white), thickness and duration from idle to full power; any single ship (Ships tab) or country (Countries tab) can get its own multipliers; `funnel_groups.txt` forces a ship into another group). A change of the engine mode affects only the new particles.
+- Columns of smoke of one ship overlap in the right order, and smoke and clouds overlap in the right order too; the smoke does not change its colour sharply at the horizon.
+- Neighbouring fires of one ship animate differently (each has its own random seed).
 - Density of fire and smoke: a multiplier of the emitted particles.
-- Ship fire smoke lasts longer before it thins out (the smoke part of the animation is 10x slower by default, a setting; the flames keep the game's speed).
+- Ship fire smoke lasts longer before it thins out (the smoke part of the animation is 5x slower by default, a setting; the flames keep the game's speed; late sprites grow and fade).
 - The sinking-bubbles effect of a wreck stops after N minutes of game time (also after a saved game is loaded).
 
 **Guns and view**
 - Machine gun burst and sound-loop fixes, gun hit sound fix.
-- Binoculars at maximum zoom start with the normal view.
 - Targets of other sides that are not seen visually are not drawn in 3D, with their wakes (fading out by themselves) and sonar cables. The camera does not centre on or follow them and returns to the selected one when it becomes visible (off by default). Submarines are included only with a separate option (also off).
 - More visible gun hit effects for calibres from 37 mm up, and blinking red lights on life rafts (each has its own switch and works at once).
 

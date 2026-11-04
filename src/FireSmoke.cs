@@ -25,6 +25,7 @@ namespace AlternativeSpecialEffects
     static class FireSmoke
     {
         public static Func<bool> IsEnabled = () => false;
+        public static Func<bool> AfterClouds = () => false;   // [Effects] SmokeAfterClouds
         public static Func<bool> SortFix = () => false;       // [Effects] SmokeSortFix
         public static Func<float> DensityFactor = () => 1f;   // [Effects] SmokeDensityFactor
         public static Func<float> LifeFactor = () => 1f;     // [Effects] SmokeLifetimeFactor
@@ -49,6 +50,7 @@ namespace AlternativeSpecialEffects
             const BindingFlags all = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
             try
             {
+                HookSort();
                 var t = asm.GetType("SeaPower.Compartments");
                 var tObp = asm.GetType("SeaPower.ObjectBaseParameters");
                 var tSc = asm.GetType("SeaPower.SystemCompartment");
@@ -163,6 +165,8 @@ namespace AlternativeSpecialEffects
                     if (st != w.States[i]) { changed |= w.States[i] >= 0; w.States[i] = st; }
                 }
                 ProlongAll(comp);
+                Funnel(comp, sys);
+                if (Verbose()) DumpFunnel(comp);
                 bool density = DensityOn();
                 if (density)
                 {
@@ -186,75 +190,28 @@ namespace AlternativeSpecialEffects
                     }
                     if (_dimmed) ResetLooks();
                 }
-                ApplyPending(comp);
                 if (Verbose()) Probe(comp, sys);
             }
             catch (Exception e) { Trace("FireSmoke.Tick: " + e.Message); }
         }
 
-        /// <summary>
-        /// A new fire effect of a ship that already has others (after a saved game is loaded all of them are made at once and would animate
-        /// identically): its particles get their own random seed and its animation starts at a random moment of the first life of a particle.
-        /// </summary>
-        public static void Scatter(object comp, object fireEffect)
+        /// <summary>Every new fire effect gets its own random seed, so neighbouring fires do not animate identically (no pre-run: the start is as in the game).</summary>
+        public static void RandomSeed(object fireEffect)
         {
-            if (comp == null || fireEffect == null) return;
-            bool others = false;
-            foreach (var f in new[] { _small, _moderate, _severe })
-            {
-                var arr = f.GetValue(comp) as Array;
-                if (arr != null) foreach (var fe in arr) if (fe != null && !ReferenceEquals(fe, fireEffect)) others = true;
-            }
-            if (!others) return;
+            if (fireEffect == null) return;
             if (_fePs2 == null) _fePs2 = fireEffect.GetType().GetField("_fireEffectPS", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             var root = _fePs2 == null ? null : _fePs2.GetValue(fireEffect) as Component;
             if (root == null) return;
             var tPs = root.GetType();
             var auto = tPs.GetProperty("useAutoRandomSeed"); var seed = tPs.GetProperty("randomSeed");
-            var main = tPs.GetProperty("main") == null ? null : tPs.GetProperty("main").GetValue(root, null);
-            var life = main == null ? null : main.GetType().GetProperty("startLifetimeMultiplier");
             if (seed != null) seed.SetValue(root, (uint)UnityEngine.Random.Range(1, int.MaxValue), null);
             if (auto != null) auto.SetValue(root, true, null);
-            // the start moment is set at the next Tick, after the smoke's look by the fire's strength has been applied: the particles made by
-            // the pre-run must already have it
-            Pending.Add(fireEffect, new Pend { T = life == null ? 0f : Convert.ToSingle(life.GetValue(main, null)) * UnityEngine.Random.value });
-        }
-
-        sealed class Pend { public float T; }
-        static readonly ConditionalWeakTable<object, Pend> Pending = new ConditionalWeakTable<object, Pend>();
-        static MethodInfo _simulate, _play; static PropertyInfo _isPlaying;
-
-        /// <summary>Tick: the effects waiting for their random start moment are run up to it (after Density).</summary>
-        static void ApplyPending(object comp)
-        {
-            foreach (var f in new[] { _small, _moderate, _severe })
-            {
-                var arr = f.GetValue(comp) as Array;
-                if (arr == null) continue;
-                foreach (var fe in arr)
-                {
-                    Pend p;
-                    if (fe == null || !Pending.TryGetValue(fe, out p)) continue;
-                    if (_isPlaying == null) _isPlaying = fe.GetType().GetProperty("IsPlaying", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (_isPlaying != null && !(bool)_isPlaying.GetValue(fe, null)) continue;   // not burning now: when it is
-                    Pending.Remove(fe);
-                    if (_fePs2 == null) _fePs2 = fe.GetType().GetField("_fireEffectPS", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    var root = _fePs2 == null ? null : _fePs2.GetValue(fe) as Component;
-                    if (root == null || p.T <= 0f) continue;
-                    var tPs = root.GetType();
-                    if (_simulate == null) { _simulate = tPs.GetMethod("Simulate", new[] { typeof(float), typeof(bool), typeof(bool), typeof(bool) }); _play = tPs.GetMethod("Play", Type.EmptyTypes); }
-                    if (_simulate == null || _play == null) continue;
-                    _simulate.Invoke(root, new object[] { p.T, true, true, true });
-                    _play.Invoke(root, null);   // Simulate leaves the system paused
-                    if (Verbose()) Trace("fire scatter: '" + root.gameObject.name + "' starts " + p.T.ToString("0.0", CultureInfo.InvariantCulture) + " s in");
-                }
-            }
         }
 
         /// <summary>Every fire effect of a ship, burning or not: the lifetime settings are applied to it (new settings reach burning ships at once).</summary>
         static void ProlongAll(object comp)
         {
-            var cam = Camera.main; bool sort = SortFix() && cam != null;
+            var cam = Camera.main; bool sort = (SortFix() || AfterClouds()) && cam != null;
             foreach (var f in new[] { _small, _moderate, _severe })
             {
                 var arr = f.GetValue(comp) as Array;
@@ -262,65 +219,232 @@ namespace AlternativeSpecialEffects
             }
         }
 
-        sealed class SortSys { public Renderer R; public float Base, Now; }
+        // ------------------------------------------------------------ smoke and clouds
+        // Clouds (TurboClouds.buildMesh) are one renderer per sky cell, kilometres wide, with many billboard quads; Unity sorts a whole cell against a smoke
+        // column by the distance to its centre, so a cell whose centre is nearer covered the smoke even with its clouds behind the ship. Drawing all smoke after
+        // the clouds (the first fix) was wrong the other way: from above the clouds or at a far ship the smoke showed through clouds in front of it.
+        // Now every column is put, before each frame, in front of or behind the clouds (sortingOrder group, see PreCull) by where the cloud layer
+        // (CloudsManager.getCloudsMinHeight .. getCloudsMaxHeight) is on the line from the camera to the column: more of the layer before it than behind it
+        // (over the same length) - behind the clouds, else in front. Whole columns against whole cells: not per pixel.
+        static Type _tClouds; static MethodInfo _mMinH, _mMaxH; static UnityEngine.Object _clouds; static float _cloudTry = -100f;
+
+        /// <summary>The heights of the cloud layer; false when there are no clouds (or they are not loaded). The manager is looked up lazily, at most every 10 s.</summary>
+        static bool CloudLayer(out float h0, out float h1)
+        {
+            h0 = h1 = 0f;
+            try
+            {
+                if (_clouds == null)
+                {
+                    if (Time.unscaledTime - _cloudTry < 10f) return false;
+                    _cloudTry = Time.unscaledTime;
+                    if (_tClouds == null)
+                    {
+                        foreach (var a in AppDomain.CurrentDomain.GetAssemblies()) { _tClouds = a.GetType("SeaPower.CloudsManager"); if (_tClouds != null) break; }
+                        if (_tClouds != null) { _mMinH = _tClouds.GetMethod("getCloudsMinHeight", Type.EmptyTypes); _mMaxH = _tClouds.GetMethod("getCloudsMaxHeight", Type.EmptyTypes); }
+                    }
+                    if (_tClouds == null || _mMinH == null || _mMaxH == null) return false;
+                    _clouds = UnityEngine.Object.FindObjectOfType(_tClouds);
+                    if (_clouds == null) return false;
+                    Trace("smoke and clouds: cloud layer " + _mMinH.Invoke(_clouds, null) + " .. " + _mMaxH.Invoke(_clouds, null));
+                }
+                h0 = Convert.ToSingle(_mMinH.Invoke(_clouds, null)); h1 = Convert.ToSingle(_mMaxH.Invoke(_clouds, null));
+                return h0 >= 0f && h1 >= h0;   // -1: not loaded
+            }
+            catch { return false; }
+        }
+
+        /// <summary>+1: the smoke at p is in front of the clouds, -1: behind them. The part of the ray inside the cloud layer before p is compared with the part after it
+        /// (up to the same distance again).</summary>
+        static int CloudSide(Vector3 cam, Vector3 p, float h0, float h1)
+        {
+            Vector3 v = p - cam; float d = v.magnitude;
+            if (d < 1e-4f) return 1;
+            float dy = v.y / d, ta, tb;
+            if (Math.Abs(dy) < 1e-6f) { if (cam.y < h0 || cam.y > h1) return 1; ta = 0f; tb = float.MaxValue; }
+            else { ta = (h0 - cam.y) / dy; tb = (h1 - cam.y) / dy; if (ta > tb) { float x = ta; ta = tb; tb = x; } }
+            ta = Math.Max(ta, 0f);
+            if (tb <= ta) return 1;
+            float front = Math.Max(0f, Math.Min(tb, d) - ta), back = Math.Max(0f, Math.Min(tb, 2f * d) - Math.Max(ta, d));
+            return front > back ? -1 : 1;
+        }
+
+        sealed class SortSys { public Renderer R; public float Base, Now; public int BaseOrd, NowOrd; }
         static readonly ConditionalWeakTable<object, List<SortSys>> Sorts = new ConditionalWeakTable<object, List<SortSys>>();
         static PropertyInfo _sFudge;
 
         /// <summary>
-        /// Unity sorts particle systems among themselves by the distance to their bounds' centre, and a tall plume's centre is high up, far from the fire:
-        /// two columns overlap in the wrong order. The sorting bias (sortingFudge, a distance) of each system is set to the game's own plus the difference between
-        /// the distance to the fire point and to the bounds' centre, so the columns are ordered by where they stand. Once a second with the fire's update.
+        /// Unity sorts particle systems by the distance to their bounds' centre, and a tall plume's centre is high up and noisy: two columns overlap in the wrong order.
+        /// So the columns are ranked by the distance to their fire points and the rank is written into sortingOrder (see Apply). The distances change with the camera, so it is
+        /// done before the camera culls (Camera.onPreCull / the scriptable pipeline's beginCameraRendering): a turn of the view is right at once.
+        /// The once-a-second fire update only makes the list of a new effect and puts the game's own values back when the option is off.
         /// </summary>
         static void Sort(object fe, Camera cam, bool on)
         {
-            List<SortSys> l;
-            if (!Sorts.TryGetValue(fe, out l))
+            Track(fe, on, () =>
             {
-                if (!on) return;
-                l = new List<SortSys>(); Sorts.Add(fe, l);
+                var rs = new List<Renderer>();
                 if (_fePs2 == null) _fePs2 = fe.GetType().GetField("_fireEffectPS", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 var root = _fePs2 == null ? null : _fePs2.GetValue(fe) as Component;
-                if (root == null) return;
-                foreach (var c in root.gameObject.GetComponentsInChildren(root.GetType(), true))
+                if (root != null)
+                    foreach (var c in root.gameObject.GetComponentsInChildren(root.GetType(), true))
+                    {
+                        string name = ((Component)c).name ?? "";
+                        if (!ReferenceEquals(c, root) && !name.StartsWith("shipfire", StringComparison.OrdinalIgnoreCase)) continue;   // flames: as they are
+                        var r = ((Component)c).GetComponent<Renderer>(); if (r != null) rs.Add(r);
+                    }
+                return rs;
+            });
+        }
+
+        /// <summary>A smoke column (a fire effect or a funnel's smoke): its renderers are listed once and then ordered before every frame; off - the game's values back.</summary>
+        static void Track(object key, bool on, Func<List<Renderer>> make)
+        {
+            List<SortSys> l;
+            if (!Sorts.TryGetValue(key, out l))
+            {
+                if (!on) return;
+                l = new List<SortSys>(); Sorts.Add(key, l); Active.Add(l); Seq[l] = _seq++;
+                foreach (var r in make())
                 {
-                    string name = ((Component)c).name ?? "";
-                    if (!ReferenceEquals(c, root) && !name.StartsWith("shipfire", StringComparison.OrdinalIgnoreCase)) continue;   // flames: as they are
-                    var r = ((Component)c).GetComponent<Renderer>(); if (r == null) continue;
                     if (_sFudge == null) _sFudge = r.GetType().GetProperty("sortingFudge");
-                    if (_sFudge == null) return;
-                    float b = Convert.ToSingle(_sFudge.GetValue(r, null));
-                    l.Add(new SortSys { R = r, Base = b, Now = b });
+                    float b = _sFudge == null ? 0f : Convert.ToSingle(_sFudge.GetValue(r, null));
+                    l.Add(new SortSys { R = r, Base = b, Now = b, BaseOrd = r.sortingOrder, NowOrd = r.sortingOrder });
                 }
             }
-            if (_sFudge == null || l.Count == 0) return;
-            var rootT = l[0].R == null ? null : l[0].R.transform;
-            float od = rootT == null ? 0f : (rootT.position - cam.transform.position).magnitude;
+            if (!on) Apply(l, false, 0, 0);
+        }
+
+        static readonly List<List<SortSys>> Active = new List<List<SortSys>>();
+        static bool _hooked;
+
+        /// <summary>on: the column's sorting order = the game's + 1000 x side (in front of / behind the clouds; 0 = as the game) - the rank by distance counted from
+        /// the middle column (nearer ones more); off: the game's values.</summary>
+        static void Apply(List<SortSys> l, bool on, int rank, int side)
+        {
             foreach (var s in l)
             {
                 if (s.R == null) continue;
-                float want = on ? s.Base + (od - (s.R.bounds.center - cam.transform.position).magnitude) : s.Base;
-                if (Math.Abs(want - s.Now) < 0.05f) continue;
-                s.Now = want; _sFudge.SetValue(s.R, want, null);
+                int ord = on ? s.BaseOrd + 1000 * side - rank : s.BaseOrd;
+                if (ord != s.NowOrd) { s.NowOrd = ord; s.R.sortingOrder = ord; }
+                if (s.Now != s.Base && _sFudge != null) { s.Now = s.Base; _sFudge.SetValue(s.R, s.Base, null); }
+            }
+        }
+
+        // Seen from the side, two columns stand at almost the same distance. The order is made of the fire points only (never the particle bounds, which are noisy):
+        // sorted by the exact distance (game units, no rounding), exactly equal ones keep their creation order; the rank goes into the sortingOrder, which Unity compares before any distance.
+        static readonly Dictionary<List<SortSys>, int> Seq = new Dictionary<List<SortSys>, int>();
+        static readonly List<KeyValuePair<float, List<SortSys>>> Ordered = new List<KeyValuePair<float, List<SortSys>>>();
+        static int _seq;
+
+        static void HookSort()
+        {
+            if (_hooked) return;
+            _hooked = true;
+            Camera.onPreCull += PreCull;
+            UnityEngine.Rendering.RenderPipelineManager.beginCameraRendering += (ctx, cam) => PreCull(cam);
+        }
+
+        public static Func<List<string>> CamOff = () => new List<string>();   // [Debug] CamOff*: the game's camera effects switched off for a test
+        public static int CamOffVersion;
+        static int _camOffDone = -1, _camOffCam;
+        static readonly Dictionary<string, bool> CamWas = new Dictionary<string, bool>();
+
+        /// <summary>Debug: the camera effects named in the [Debug] options are switched off (their own state is put back when the option goes off).</summary>
+        static void CamEffects(Camera cam)
+        {
+            if (_camOffDone == CamOffVersion && _camOffCam == cam.GetInstanceID()) return;
+            if (_camOffCam != cam.GetInstanceID()) CamWas.Clear();
+            _camOffDone = CamOffVersion; _camOffCam = cam.GetInstanceID();
+            var off = CamOff();
+            foreach (var b in cam.GetComponents<Behaviour>())
+            {
+                string n = b.GetType().Name;
+                if (n != "AmplifyColorEffect" && n != "UnderWaterPostEffect" && n != "AmplifyOcclusionEffect" && n != "AmplifyBloomEffect") continue;
+                bool was;
+                if (off.Contains(n)) { if (!CamWas.ContainsKey(n)) CamWas[n] = b.enabled; b.enabled = false; Trace("camera effect " + n + " off (test)"); }
+                else if (CamWas.TryGetValue(n, out was)) { b.enabled = was; CamWas.Remove(n); Trace("camera effect " + n + " back to " + was); }
+            }
+        }
+
+        static bool _skyDumped;
+
+        /// <summary>Debug, once: what is drawn around the smoke - the sky meshes the game finds by name and every renderer in a late render queue
+        /// (for the colour step of the smoke at the horizon: something drawn after the smoke where the depth is the far plane).</summary>
+        static void DumpSky(Camera cam)
+        {
+            _skyDumped = true;
+            try
+            {
+                var sb = new System.Text.StringBuilder("sky and late renderers (camera '" + cam.name + "' clear " + cam.clearFlags + ", far " + cam.farClipPlane + ", depth mode " + cam.depthTextureMode + ", colour space " + QualitySettings.activeColorSpace + "):");
+                foreach (var n in new[] { "Skybox", "High Altitude Clouds", "Sun Flare", "Moon Flare" })
+                {
+                    var go = GameObject.Find(n);
+                    var r = go == null ? null : go.GetComponent<Renderer>();
+                    sb.Append("\n  '").Append(n).Append("' ");
+                    if (r == null) { sb.Append("not found"); continue; }
+                    sb.Append("active ").Append(go.activeInHierarchy).Append(" layer ").Append(go.layer).Append(" order ").Append(r.sortingOrder).Append(" bounds ").Append(r.bounds.size).Append(" at ").Append(r.bounds.center);
+                    foreach (var m in r.sharedMaterials) if (m != null) sb.Append("\n    material '").Append(m.name).Append("' shader '").Append(m.shader == null ? "?" : m.shader.name).Append("' queue ").Append(m.renderQueue);
+                }
+                int k = 0;
+                foreach (var r in UnityEngine.Object.FindObjectsOfType<Renderer>())
+                {
+                    var m = r.sharedMaterial;
+                    if (m == null || m.renderQueue < 2500 || r is ParticleSystemRenderer) continue;
+                    if (++k > 40) break;
+                    sb.Append("\n  late: '").Append(r.name).Append("' ").Append(r.GetType().Name).Append(" layer ").Append(r.gameObject.layer).Append(" material '").Append(m.name).Append("' shader '").Append(m.shader == null ? "?" : m.shader.name).Append("' queue ").Append(m.renderQueue).Append(" order ").Append(r.sortingOrder).Append(" bounds ").Append(r.bounds.size);
+                }
+                foreach (var b in cam.GetComponents<Behaviour>()) sb.Append("\n  camera component ").Append(b.GetType().FullName).Append(" enabled ").Append(b.enabled);
+                Trace(sb.ToString());
+            }
+            catch (Exception e) { Trace("DumpSky: " + e.Message); }
+        }
+
+        static void PreCull(Camera cam)
+        {
+            if (!_skyDumped && Verbose() && cam != null && cam == Camera.main && Time.timeSinceLevelLoad > 5f) DumpSky(cam);
+            if (cam != null && cam == Camera.main) CamEffects(cam);
+            bool sort = SortFix(), clouds = AfterClouds();
+            if (cam == null || cam != Camera.main || !(sort || clouds)) return;
+            float h0 = 0f, h1 = 0f;
+            bool layer = clouds && CloudLayer(out h0, out h1);
+            Vector3 cp = cam.transform.position;
+            Ordered.Clear();
+            for (int i = Active.Count - 1; i >= 0; i--)
+            {
+                var l = Active[i]; Transform t = null;
+                foreach (var s in l) if (s.R != null) { t = s.R.transform; break; }
+                if (t == null) { Active.RemoveAt(i); Seq.Remove(l); continue; }
+                Ordered.Add(new KeyValuePair<float, List<SortSys>>((t.position - cp).magnitude, l));
+            }
+            if (sort) Ordered.Sort((x, y) => { int c = x.Key.CompareTo(y.Key); return c != 0 ? c : Seq[x.Value].CompareTo(Seq[y.Value]); });   // exact distance; only equal ones go by creation order
+            int mid = Ordered.Count / 2;   // the middle column keeps the game's order, the nearer ones get more, the farther ones less
+            for (int i = 0; i < Ordered.Count; i++)
+            {
+                var l = Ordered[i].Value;
+                int side = 0;
+                if (layer) foreach (var s in l) if (s.R != null) { side = CloudSide(cp, s.R.bounds.center, h0, h1); break; }
+                Apply(l, true, sort ? i - mid : 0, side);
             }
         }
 
         // ------------------------------------------------------------ smoke that lasts longer
 
         static PropertyInfo _lMain, _lLife, _lMax, _lEm, _lRate;
-        public static float FireShare = 0.5f;   // [Effects] SmokeFireShare: the first part of the sprite animation has the fire in it, the rest only smoke
-        static readonly string[] OverLife = { "textureSheetAnimation" };   // only the picture is re-timed: movement, size and colour stay as the game made them
+        public static float SpreadGrow = 0.5f, SpreadFade = 1f;   // [Effects] SmokeSpreadGrowth / SmokeSpreadFade: sprites of the slowed stage grow and fade
+        public static float FireShare = 0.3f;   // [Effects] SmokeFireShare: the first part of the sprite animation has the fire in it, the rest only smoke
 
-        sealed class Sys { public object Ps; public bool Smoke, SmokeOnly; public float BaseRate; public float BaseLife; public int BaseMax; public Dictionary<string, AnimationCurve> Curves = new Dictionary<string, AnimationCurve>(); }
-        sealed class LifeState { public float K = -1f, Share = -1f, Dens = -1f; public List<Sys> S = new List<Sys>(); }
+        sealed class Sys { public object Ps; public bool Smoke, SmokeOnly; public float BaseRate; public float BaseLife; public int BaseMax; }
+        sealed class LifeState { public float K = -1f, Share = -1f, Dens = -1f, Grow = -1f, Fade = -1f; public List<Sys> S = new List<Sys>(); }
         static readonly ConditionalWeakTable<object, LifeState> Lives = new ConditionalWeakTable<object, LifeState>();
 
         /// <summary>
-        /// A fire effect (new or already burning, once a second from Tick): only the smoke part of the sprite animation is stretched. The sprites of the
-        /// fire system carry the fire and the smoke in one animation (the fire is gone after SmokeFireShare of it): that part runs at the game's
-        /// speed, the rest SmokeLifetimeFactor times slower - the start lifetime is longer and the texture sheet animation is re-timed to match.
-        /// Movement is not touched. A smoke-only system (its material is a smoke one) is stretched whole. The rate stays the game's.
-        /// Everything is computed from the values as the game made them, so a changed setting is applied at once to burning ships too
-        /// (particles already in the air keep their life; new ones follow the setting).
+        /// A fire effect (new or already burning, once a second from Tick). The sprites of the fire system carry the fire and the smoke in one animation
+        /// (the fire is gone after SmokeFireShare of it). The system stays as the game made it (life, every over-lifetime curve): each particle lives its
+        /// first SmokeFireShare exactly as in the game, then AseFireStretch (a particle job) makes the rest of its life SmokeLifetimeFactor times longer,
+        /// so every curve (picture, size, colour, velocity) goes on from where it was, k times slower: no jump, the particle does not brake.
+        /// A smoke-only system (its material is a smoke one) gets a longer start lifetime. The rate is the game's x SmokeDensityFactor.
+        /// Everything is computed from the values as the game made them, so a changed setting reaches burning ships at once (new crossings follow it).
         /// </summary>
         public static void Prolong(object fireEffect)
         {
@@ -357,8 +481,8 @@ namespace AlternativeSpecialEffects
                 }
             }
             float share = FireShare;
-            if (Math.Abs(st.K - k) < 1e-4f && Math.Abs(st.Share - share) < 1e-4f && Math.Abs(st.Dens - dens) < 1e-4f) return;
-            st.K = k; st.Share = share; st.Dens = dens;
+            if (Math.Abs(st.K - k) < 1e-4f && Math.Abs(st.Share - share) < 1e-4f && Math.Abs(st.Dens - dens) < 1e-4f && Math.Abs(st.Grow - SpreadGrow) < 1e-4f && Math.Abs(st.Fade - SpreadFade) < 1e-4f) return;
+            st.K = k; st.Share = share; st.Dens = dens; st.Grow = SpreadGrow; st.Fade = SpreadFade;
             var log = new System.Text.StringBuilder();
             foreach (var sy in st.S)
             {
@@ -366,64 +490,14 @@ namespace AlternativeSpecialEffects
                 if (ps == null) continue;
                 float whole = !sy.Smoke ? 1f : sy.SmokeOnly ? k : share + (1f - share) * k;   // the new lifetime / the game's
                 var main = _lMain.GetValue(ps, null);
-                if (sy.Smoke) _lLife.SetValue(main, sy.BaseLife * whole, null);
+                if (sy.SmokeOnly) _lLife.SetValue(main, sy.BaseLife * whole, null);
                 _lMax.SetValue(main, (int)Math.Min(100000f, sy.BaseMax * whole * Math.Max(1f, dens) + 1f), null);   // room for the particles, nothing else changes
                 _lRate.SetValue(_lEm.GetValue(ps, null), sy.BaseRate * dens, null);
-                int curves = 0;
-                if (sy.Smoke && !sy.SmokeOnly) foreach (var mn in OverLife) curves += Retime(ps, ps.GetType(), mn, share / whole, sy.Curves);
-                log.Append("\n  '").Append(ps.name).Append("' ").Append(sy.SmokeOnly ? "whole" : "second half").Append(" x").Append(whole.ToString("0.##", CultureInfo.InvariantCulture)).Append(", ").Append(curves).Append(" curves re-timed");
+                string how = !sy.Smoke ? "as made" : sy.SmokeOnly ? "whole x" + whole.ToString("0.##", CultureInfo.InvariantCulture)
+                           : AseFireStretch.Set(ps as ParticleSystem, share, k, SpreadGrow, SpreadFade, Trace) ? "after " + (share * 100f).ToString("0") + "% x" + k.ToString("0.##", CultureInfo.InvariantCulture) : "not stretched";
+                log.Append("\n  '").Append(ps.name).Append("' ").Append(how);
             }
             if (Verbose()) Trace("smoke lifetime x" + k.ToString("0.##", CultureInfo.InvariantCulture) + " from " + (share * 100f).ToString("0") + "%" + log);
-        }
-
-        /// <summary>The game's time t (0..1 of the life) -> the new one: the first part is squeezed to [0, a], the rest stretched over [a, 1].</summary>
-        static float Unwarp(float u, float a, float share) { return u <= a ? u * share / a : share + (u - a) * (1f - share) / (1f - a); }
-
-        /// <summary>Every over-lifetime curve of one module (if it is on) is re-timed from the game's own curve. Returns how many.</summary>
-        static int Retime(object ps, Type tPs, string moduleName, float a, Dictionary<string, AnimationCurve> bases)
-        {
-            var mp = tPs.GetProperty(moduleName);
-            if (mp == null) return 0;
-            var mod = mp.GetValue(ps, null);
-            var en = mod.GetType().GetProperty("enabled");
-            if (en == null || !(bool)en.GetValue(mod, null)) return 0;
-            int n = 0;
-            foreach (var pr in mod.GetType().GetProperties())
-            {
-                if (!pr.CanRead || !pr.CanWrite || pr.GetIndexParameters().Length != 0 || pr.Name.IndexOf("start", StringComparison.OrdinalIgnoreCase) >= 0 || pr.PropertyType.Name != "MinMaxCurve") continue;
-                var v = pr.GetValue(mod, null);
-                int mode = Convert.ToInt32(v.GetType().GetProperty("mode").GetValue(v, null));
-                bool changed = false;
-                if (mode == 1) changed = SetCurve(v, "curve", a, bases, moduleName + "." + pr.Name);
-                else if (mode == 2) { bool c1 = SetCurve(v, "curveMin", a, bases, moduleName + "." + pr.Name), c2 = SetCurve(v, "curveMax", a, bases, moduleName + "." + pr.Name); changed = c1 || c2; }
-                if (changed) { pr.SetValue(mod, v, null); n++; }
-            }
-            return n;
-        }
-
-        static bool SetCurve(object v, string prop, float a, Dictionary<string, AnimationCurve> bases, string key)
-        {
-            var p = v.GetType().GetProperty(prop); if (p == null) return false;
-            key += "." + prop;
-            AnimationCurve old;
-            if (!bases.TryGetValue(key, out old))
-            {
-                var cur = p.GetValue(v, null) as AnimationCurve;
-                if (cur == null || cur.length == 0) return false;
-                old = new AnimationCurve(cur.keys) { preWrapMode = cur.preWrapMode, postWrapMode = cur.postWrapMode };   // the game's, kept
-                bases[key] = old;
-            }
-            float share = FireShare;
-            var nc = new AnimationCurve { preWrapMode = old.preWrapMode, postWrapMode = old.postWrapMode };
-            const int N = 32;
-            var times = new List<float>();
-            for (int i = 0; i <= N; i++) times.Add(i / (float)N);
-            times.Add(a); times.Sort();
-            float last = -1f;
-            foreach (var u in times) { if (u - last < 1e-4f) continue; last = u; nc.AddKey(new Keyframe(u, old.Evaluate(Unwarp(u, a, share)))); }
-            for (int i = 0; i < nc.length; i++) nc.SmoothTangents(i, 0f);
-            p.SetValue(v, nc, null);
-            return true;
         }
 
         // ------------------------------------------------------------ smoke opacity by the fire's strength within its stage
@@ -742,6 +816,31 @@ namespace AlternativeSpecialEffects
             return list;
         }
 
+        public static Func<bool> KeepOnStop = () => false;
+
+        /// <summary>Replaces the game's ParticleSystem.Stop() in FireEffect.Deactivate: only emission stops, live particles stay.</summary>
+        public static void StopFire(ParticleSystem ps)
+        {
+            if (ps == null) return;
+            if (KeepOnStop()) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            else ps.Stop();
+        }
+
+        public static IEnumerable<CodeInstruction> DeactivateTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var list = new List<CodeInstruction>(instructions);
+            var repl = typeof(FireSmoke).GetMethod("StopFire", BindingFlags.Static | BindingFlags.Public);
+            int n = 0;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var m = list[i].operand as MethodInfo;
+                if (m == null || m.Name != "Stop" || m.DeclaringType != typeof(ParticleSystem)) continue;
+                if (m.GetParameters().Length == 0) { list[i] = new CodeInstruction(OpCodes.Call, repl).MoveLabelsFrom(list[i]); n++; }
+            }
+            Trace("FireEffect.Deactivate: " + n + " Stop() calls replaced");
+            return list;
+        }
+
         // ------------------------------------------------------------ diagnostics: what the fire effects are made of (trace)
 
         static readonly HashSet<string> Dumped = new HashSet<string>();
@@ -749,6 +848,33 @@ namespace AlternativeSpecialEffects
 
         /// <summary>Postfix of Compartments.CreateFireEffect: the effect's particle systems, once per effect (for smooth smoke).
         /// Reflection only: the particle and audio modules are not referenced.</summary>
+        /// <summary>Debug: a MinMaxCurve as text - its mode and constants or curve keys (time:value).</summary>
+        static string Mmc(object v)
+        {
+            try
+            {
+                if (v == null || v is string) return "?";
+                var t = v.GetType(); int mode = Convert.ToInt32(t.GetProperty("mode").GetValue(v, null));
+                Func<string, string> key = n =>
+                {
+                    var c = t.GetProperty(n).GetValue(v, null) as AnimationCurve;
+                    if (c == null) return "-";
+                    var ks = new System.Text.StringBuilder();
+                    foreach (var k in c.keys) ks.Append(k.time.ToString("0.##", CultureInfo.InvariantCulture)).Append(':').Append(k.value.ToString("0.###", CultureInfo.InvariantCulture)).Append(' ');
+                    return "[" + ks.ToString().TrimEnd() + "]";
+                };
+                string mul = " x" + Convert.ToSingle(t.GetProperty("curveMultiplier").GetValue(v, null)).ToString("0.###", CultureInfo.InvariantCulture);
+                switch (mode)
+                {
+                    case 0: return "const " + t.GetProperty("constant").GetValue(v, null);
+                    case 1: return "curve " + key("curve") + mul;
+                    case 2: return "twoCurves " + key("curveMin") + " .. " + key("curveMax") + mul;
+                    default: return "twoConst " + t.GetProperty("constantMin").GetValue(v, null) + " .. " + t.GetProperty("constantMax").GetValue(v, null);
+                }
+            }
+            catch { return "?"; }
+        }
+
         public static void DumpEffect(object fireEffect)
         {
             try
@@ -769,6 +895,25 @@ namespace AlternativeSpecialEffects
                       .Append(" dist ").Append(P(em, "rateOverDistanceMultiplier")).Append(" bursts ").Append(P(em, "burstCount"))
                       .Append(" size ").Append(P(main, "startSizeMultiplier")).Append(" life ").Append(P(main, "startLifetimeMultiplier"))
                       .Append(" max ").Append(P(main, "maxParticles")).Append(" loop ").Append(P(main, "loop"));
+                    sb.Append("\n    main speed ").Append(P(main, "simulationSpeed")).Append(" delay ").Append(Mmc(P(main, "startDelay"))).Append(" prewarm ").Append(P(main, "prewarm")).Append(" duration ").Append(P(main, "duration")).Append(" scaling ").Append(P(main, "scalingMode")).Append(" space ").Append(P(main, "simulationSpace")).Append(" gravity ").Append(Mmc(P(main, "gravityModifier"))).Append(" lossyScale ").Append(((Component)c).transform.lossyScale.ToString("0.###"));
+                    object shp = P(c, "shape");
+                    sb.Append("\n    shape on=").Append(P(shp, "enabled")).Append(" type ").Append(P(shp, "shapeType")).Append(" radius ").Append(P(shp, "radius")).Append(" scale ").Append(P(shp, "scale"));
+                    sb.Append("\n    modules on:");
+                    foreach (var mn in new[] { "velocityOverLifetime", "limitVelocityOverLifetime", "inheritVelocity", "forceOverLifetime", "colorOverLifetime", "colorBySpeed", "sizeBySpeed", "rotationOverLifetime", "rotationBySpeed", "noise", "externalForces", "subEmitters", "trails", "lights" })
+                    { object md = P(c, mn); if (md != null && !(md is string) && Convert.ToString(P(md, "enabled")) == "True") sb.Append(' ').Append(mn); }
+                    object sub = P(c, "subEmitters");
+                    if (sub != null && !(sub is string) && Convert.ToString(P(sub, "enabled")) == "True")
+                        try
+                        {
+                            int sn = Convert.ToInt32(P(sub, "subEmittersCount")); sb.Append("\n    subEmitters:");
+                            var gs = sub.GetType().GetMethod("GetSubEmitterSystem"); var gt = sub.GetType().GetMethod("GetSubEmitterType");
+                            for (int si = 0; si < sn; si++) sb.Append(" '").Append(((Component)gs.Invoke(sub, new object[] { si })).name).Append("' ").Append(gt.Invoke(sub, new object[] { si }));
+                        }
+                        catch { }
+                    sb.Append("\n    startSize ").Append(Mmc(P(main, "startSize"))).Append(" startLifetime ").Append(Mmc(P(main, "startLifetime"))).Append(" speed ").Append(Mmc(P(main, "startSpeed")));
+                    object sol = P(c, "sizeOverLifetime"), tsa = P(c, "textureSheetAnimation");
+                    sb.Append("\n    sizeOverLifetime on=").Append(P(sol, "enabled")).Append(" sep=").Append(P(sol, "separateAxes")).Append(" size ").Append(Mmc(P(sol, "size")));
+                    sb.Append("\n    sheet on=").Append(P(tsa, "enabled")).Append(" tiles ").Append(P(tsa, "numTilesX")).Append("x").Append(P(tsa, "numTilesY")).Append(" frame ").Append(Mmc(P(tsa, "frameOverTime"))).Append(" start ").Append(Mmc(P(tsa, "startFrame")));
                     DumpMaterial(sb, ((Component)c).GetComponent<Renderer>());
                 }
                 foreach (var l in root.GetComponentsInChildren<Light>(true)) sb.Append("\n  Light '").Append(l.name).Append("' ").Append(l.intensity.ToString("0.##"));
@@ -798,6 +943,466 @@ namespace AlternativeSpecialEffects
                 }
             }
             catch (Exception e) { sb.Append(" (material: ").Append(e.Message).Append(')'); }
+        }
+
+        // ------------------------------------------------------------ funnel smoke by the engine type and load
+
+        public static Func<float> FunnelGlobal = () => 1f;                  // [FunnelSmoke] GlobalDensity
+        public static Func<float> FunnelGlobalThick = () => 1f;             // [FunnelSmoke] GlobalThickness
+        public static Func<string, float[]> FunnelNation = n => null;      // [FunnelSmoke] Nations: nation -> the same multipliers
+        public static Func<string, float[]> FunnelShip = n => null;        // [FunnelSmoke] Ships: ini name -> particles, duration, lightness, thickness multipliers
+        public static Func<bool> FunnelOn = () => false;                    // [FunnelSmoke] Enabled
+        public static Func<float> FunnelPowerExp = () => 0f, FunnelPowerRef = () => 50000f, FunnelSizeExp = () => 0f;
+        public static Func<string, float[]> FunnelGroup = g => null;        // group -> density idle, full, lightness idle, full (0..1), thickness idle, full, lifetime idle, full
+        sealed class FSys { public object Ps; public float Rate; public int Max; public object Col, LifeCol; public Renderer Rend; public Color Tint, Work; public bool HasTint; public float Size = 1f, Life = 1f, SzMult = 1f; public Keyframe[] SzKeys; public bool SzOn, SzOk; }
+        sealed class FState { public List<FSys> S = new List<FSys>(); public float D = -1f, B = -1f, O = -1f, Z = -1f, Om = -1f, K = -1f; }
+        static readonly ConditionalWeakTable<object, FState> Funnels = new ConditionalWeakTable<object, FState>();
+        static FieldInfo _cVessel, _vInUse, _vVel; static PropertyInfo _vMaxSpeed, _psType, _eRate, _eRateDummy; static PropertyInfo _lEm2, _lRate2;
+        static Dictionary<string, string> _forced;
+        static PropertyInfo _maxP;
+        static PropertyInfo _lMaxP() { return _maxP ?? (_maxP = _psMain.PropertyType.GetProperty("maxParticles")); }
+
+        /// <summary>funnel_groups.txt (next to the dll): "ini_name = Group" forces a ship into a group; Diesel, Steam, GasTurbine, Nuclear, Combined.</summary>
+        static Dictionary<string, string> Forced()
+        {
+            if (_forced != null) return _forced;
+            var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                string path = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(FireSmoke).Assembly.Location) ?? "", "funnel_groups.txt");
+                if (System.IO.File.Exists(path))
+                    foreach (var raw in System.IO.File.ReadAllLines(path))
+                    {
+                        string line = raw.Trim(); int eq = line.IndexOf('=');
+                        if (line.Length == 0 || line[0] == ';' || line[0] == '#' || eq <= 0) continue;
+                        string k = line.Substring(0, eq).Trim(); if (k.EndsWith(".ini", StringComparison.OrdinalIgnoreCase)) k = k.Substring(0, k.Length - 4);
+                        d[k] = line.Substring(eq + 1).Trim();
+                    }
+            }
+            catch (Exception e) { Trace("funnel_groups.txt: " + e.Message); }
+            return _forced = d;
+        }
+
+        /// <summary>
+        /// The funnel smoke of a ship (the game only plays / stops it): the emission rate and the start colour follow the engine group (the type of
+        /// the power system in use, or the group forced in funnel_groups.txt) and the load (speed / maximum speed): density x (idle -> full power),
+        /// brightness x of the colour, opacity %. Computed from the prefab's own values; once a second with the fire's update.
+        /// </summary>
+        static void Funnel(object comp, Array sys)
+        {
+            const BindingFlags all = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            if (sys.Length < 1 || !DensityInit(comp, sys.GetValue(0))) return;
+            if (_cVp == null) _cVp = comp.GetType().GetField("_vp", all);
+            var vp = _cVp == null ? null : _cVp.GetValue(comp);
+            if (vp == null) return;
+            if (_vpFunnel == null) { _vpFunnel = vp.GetType().GetField("_funnelSmoke", all); _vpName = vp.GetType().GetField("_objectIniName", all); _vpHp = vp.GetType().GetField("_horsePower", all); }
+            var root = _vpFunnel == null ? null : _vpFunnel.GetValue(vp) as Component;
+            if (root == null) return;
+            if (_lEm2 == null) { _lEm2 = _tPs.GetProperty("emission"); _lRate2 = _lEm2 == null ? null : _lEm2.PropertyType.GetProperty("rateOverTimeMultiplier"); if (_lRate2 == null) return; }
+            FState st;
+            if (!Funnels.TryGetValue(root, out st))
+            {
+                st = new FState(); Funnels.Add(root, st);
+                foreach (var c in root.gameObject.GetComponentsInChildren(_tPs, true))
+                    st.S.Add(new FSys { Ps = c, LifeCol = null, Rend = ((Component)c).GetComponent<Renderer>(), Max = Convert.ToInt32(_lMaxP().GetValue(_psMain.GetValue(c, null), null)), Rate = Convert.ToSingle(_lRate2.GetValue(_lEm2.GetValue(c, null), null)), Col = Detached(_mainColor.GetValue(_psMain.GetValue(c, null), null)) }); SizeInit(st.S[st.S.Count - 1]);
+            }
+            float d = 1f, b = -1f, o = 1f, om = 1f, k = 1f; string group = "-";
+            if (FunnelOn())
+            {
+                string name = _vpName == null ? "" : Convert.ToString(_vpName.GetValue(vp));
+                if (!Forced().TryGetValue(name, out group)) group = GroupOf(comp);
+                var p = FunnelGroup(group);
+                if (p != null)
+                {
+                    float load = group == "Combined" ? BoostLoad(comp) : Load(comp);
+                    d = Math.Max(0f, FunnelGlobal()) * Mathf.Lerp(p[0], p[1], load) * Ratio(vp, FunnelPowerExp(), 1f, 2f); b = Mathf.Clamp01(Mathf.Lerp(p[2], p[3], load)); o = Mathf.Clamp(Math.Max(0f, FunnelGlobalThick()) * Mathf.Lerp(p[4], p[5], load), 0f, 100f); om = Mathf.Clamp(Math.Max(0f, FunnelGlobalThick()) * Math.Max(p[4], p[5]), 1e-4f, 100f); k = Mathf.Clamp(Mathf.Lerp(p[6], p[7], load), 0.01f, 1f);
+                    float tm = 1f;
+                    foreach (var mine in new[] { FunnelNation(NationOf(vp)), FunnelShip(name) })
+                        if (mine != null) { d *= mine[0]; k = Mathf.Clamp(k * mine[1], 0.01f, 10f); if (b >= 0f) b = Mathf.Clamp01(b * mine[2]); tm *= mine[3]; }
+                    o = Mathf.Clamp(o * tm, 0f, 100f); om = Mathf.Clamp(om * tm, 1e-4f, 100f);
+                }
+            }
+            Track(st, SortFix() || AfterClouds(), () => { var rs = new List<Renderer>(); foreach (var s in st.S) if (s.Rend != null) rs.Add(s.Rend); return rs; });
+            float z = FunnelOn() ? Ratio(vp, FunnelSizeExp()) : 1f;
+            if (Math.Abs(d - st.D) < 0.02f && Math.Abs(b - st.B) < 0.02f && Math.Abs(o - st.O) < 0.005f && Math.Abs(om - st.Om) < 0.005f && Math.Abs(k - st.K) < 0.005f && Math.Abs(z - st.Z) < 0.01f) return;
+            st.D = d; st.B = b; st.O = o; st.Om = om; st.K = k; st.Z = z;
+            foreach (var s in st.S)
+            {
+                _lRate2.SetValue(_lEm2.GetValue(s.Ps, null), s.Rate * d, null);
+                var main = _psMain.GetValue(s.Ps, null);
+                _lMaxP().SetValue(main, (int)Math.Min(100000f, s.Max * Math.Max(1f, d) * Math.Max(1f, k) + 1f), null);   // room for the particles
+                ApplyTint(s, b, o, om);
+                if (_mLifeMul != null) _mLifeMul.SetValue(main, s.Life * k, null);
+                ApplySize(s, z, k);
+            }
+            if (Verbose()) Trace("funnel smoke: '" + root.gameObject.name + "' group " + group + " density x" + d.ToString("0.00", CultureInfo.InvariantCulture) + " lightness " + (b < 0f ? "game" : (b * 100f).ToString("0") + "%") + " opacity " + (o * 100f).ToString("0") + "% duration x" + k.ToString("0.00", CultureInfo.InvariantCulture));
+        }
+
+        static FieldInfo _vpNation;
+
+        /// <summary>The nation of the ship (its variant's Nation= in the ini; the nation override of the mission counts).</summary>
+        static string NationOf(object vp)
+        {
+            try
+            {
+                if (_vpNation == null) _vpNation = FindField(vp.GetType(), "_nation");
+                return _vpNation == null ? "" : Convert.ToString(_vpNation.GetValue(vp)) ?? "";
+            }
+            catch { return ""; }
+        }
+
+        /// <summary>(horsepower / reference) ^ exponent, limited to 0.1..4: 1 when the exponent is 0 or the power is unknown.</summary>
+        static float Ratio(object vp, float e, float lo = 0.1f, float hi = 4f)
+        {
+            float r = Math.Max(1f, FunnelPowerRef());
+            if (e <= 0f || _vpHp == null) return 1f;
+            float hp; try { hp = Convert.ToSingle(_vpHp.GetValue(vp)); } catch { return 1f; }
+            if (hp <= 0f) return 1f;
+            return Mathf.Clamp(Mathf.Pow(hp / r, e), lo, hi);
+        }
+
+        static PropertyInfo _mLifeMul, _mSizeMul, _tSizeLife, _slEnabled, _slSize, _cvMode, _cvCurve, _cvMul; static ConstructorInfo _cvCtor;
+
+        /// <summary>The prefab's size: the start size and the size-over-lifetime curve (null when that module is off).</summary>
+        static void SizeInit(FSys s)
+        {
+            try
+            {
+                var main = _psMain.GetValue(s.Ps, null);
+                if (_mSizeMul == null) _mSizeMul = _psMain.PropertyType.GetProperty("startSizeMultiplier");
+                if (_tSizeLife == null)
+                {
+                    _tSizeLife = _tPs.GetProperty("sizeOverLifetime");
+                    _slEnabled = _tSizeLife.PropertyType.GetProperty("enabled"); _slSize = _tSizeLife.PropertyType.GetProperty("size");
+                    _cvMode = _slSize.PropertyType.GetProperty("mode"); _cvCurve = _slSize.PropertyType.GetProperty("curve"); _cvMul = _slSize.PropertyType.GetProperty("curveMultiplier");
+                    _cvCtor = _slSize.PropertyType.GetConstructor(new[] { typeof(float), typeof(AnimationCurve) });
+                }
+                if (_mSizeMul == null || _cvCtor == null) return;
+                s.Size = Convert.ToSingle(_mSizeMul.GetValue(main, null));
+                if (_mLifeMul == null) _mLifeMul = _psMain.PropertyType.GetProperty("startLifetimeMultiplier");
+                if (_mLifeMul != null) s.Life = Convert.ToSingle(_mLifeMul.GetValue(main, null));
+                var sl = _tSizeLife.GetValue(s.Ps, null);
+                if (!(bool)_slEnabled.GetValue(sl, null)) { s.SzKeys = new[] { new Keyframe(0f, 1f), new Keyframe(1f, 1f) }; s.SzOn = false; s.SzOk = true; return; }
+                var cv = _slSize.GetValue(sl, null);
+                if (Convert.ToInt32(_cvMode.GetValue(cv, null)) != 1) { s.SzOk = false; return; }   // only a single curve is re-scaled
+                s.SzKeys = ((AnimationCurve)_cvCurve.GetValue(cv, null)).keys; s.SzMult = Convert.ToSingle(_cvMul.GetValue(cv, null)); s.SzOn = true; s.SzOk = true;
+            }
+            catch { s.SzOk = false; }
+        }
+
+        /// <summary>Size by the engines' power: a large ship (z > 1) starts with bigger particles and ends at the game's size, a small one (z < 1) starts at the game's size and ends smaller.</summary>
+        static void ApplySize(FSys s, float z, float k)
+        {
+            try
+            {
+                var main = _psMain.GetValue(s.Ps, null);
+                if (_mSizeMul != null) _mSizeMul.SetValue(main, s.Size * Math.Max(1f, z), null);
+                if (!s.SzOk || s.SzKeys == null) return;
+                float e = z > 1f ? 1f / z : z, kk = Mathf.Clamp(k, 0.01f, 1f);
+                var sl = _tSizeLife.GetValue(s.Ps, null);
+                if (!s.SzOn && e >= 0.999f) { _slEnabled.SetValue(sl, false, null); return; }
+                // A shorter life must not make the sprite grow faster: the particle lives kk of the game's time, so it follows only the first kk of the game's
+                // size curve, stretched over its (shorter) life - the same size at the same age in seconds, the end of the curve is simply never reached.
+                var src = new AnimationCurve(s.SzKeys);
+                var list = new List<Keyframe>();
+                if (kk >= 0.999f) list.AddRange(s.SzKeys);
+                else
+                {
+                    foreach (var key in s.SzKeys) if (key.time < kk - 1e-4f) { var c = key; c.time = key.time / kk; c.inTangent *= kk; c.outTangent *= kk; list.Add(c); }
+                    float tan = (src.Evaluate(Math.Min(1f, kk + 0.001f)) - src.Evaluate(Math.Max(0f, kk - 0.001f))) / 0.002f * kk;
+                    list.Add(new Keyframe(1f, src.Evaluate(kk), tan, tan));
+                }
+                var arr = list.ToArray();
+                for (int i = 0; i < arr.Length; i++) { float f = Mathf.Lerp(1f, e, Mathf.Clamp01(arr[i].time)); arr[i].value *= f; arr[i].inTangent *= f; arr[i].outTangent *= f; }
+                _slSize.SetValue(sl, _cvCtor.Invoke(new object[] { s.SzMult, new AnimationCurve(arr) }), null);
+                _slEnabled.SetValue(sl, true, null);
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Lightness and thickness. The funnel smoke material is Alpha Blended: colour = 2 x _TintColor x particle colour x texture, _TintColor alpha is only 0.02 and the
+        /// particle's own alpha is already 1. A plain multiplier of _TintColor keeps the hue of the texture and of the particle colours (brownish): more of it
+        /// only went from black to orange, never white. So _TintColor is set per channel: the average colour of the smoke (the texture's, weighted by its alpha,
+        /// read once through a small render texture, x the start colour x the colour over the lifetime) becomes a neutral grey of the wanted lightness
+        /// (0 black .. 1 white), in the project's colour space. Thickness multiplies the alpha. Per renderer through a property block (the material is shared).
+        /// The tint is fixed (white at the group's highest thickness); the load changes only the particles' start colour (a fraction of it), so smoke already in the air keeps its look.
+        /// l &lt; 0: the game's colour.
+        /// </summary>
+        static void ApplyTint(FSys s, float l, float o, float om)
+        {
+            try
+            {
+                if (s.Rend == null) return;
+                bool lin = QualitySettings.activeColorSpace == ColorSpace.Linear;
+                if (!s.HasTint)
+                {
+                    var m = s.Rend.sharedMaterial;
+                    if (m == null || !m.HasProperty("_TintColor")) { s.HasTint = true; s.Rend = null; return; }
+                    s.Tint = m.GetColor("_TintColor"); s.HasTint = true;
+                    s.Work = SmokeColour(s, m);
+                }
+                // The tint (per renderer, it changes every particle of the system) is fixed: the brightest and most opaque smoke the group can make.
+                // What changes with the engine's load is only the start colour of the particles (a fraction of that), so smoke already in the air keeps its look.
+                var tl = new float[3]; var wk = new[] { s.Work.r, s.Work.g, s.Work.b };
+                for (int i = 0; i < 3; i++) tl[i] = l < 0f ? 1f : Math.Min(16f, 1f / (2f * Math.Max(wk[i], 1e-3f)));      // linear tint that makes white
+                var pb = new MaterialPropertyBlock();
+                s.Rend.GetPropertyBlock(pb);
+                Color c;
+                if (l < 0f) c = s.Tint;
+                else
+                {
+                    Func<float, float> g = v => lin ? Mathf.LinearToGammaSpace(v) : v;
+                    c = new Color(g(tl[0]), g(tl[1]), g(tl[2]), 0f);
+                }
+                c.a = s.Tint.a * om;
+                pb.SetColor("_TintColor", c);
+                s.Rend.SetPropertyBlock(pb);
+                // the particles' start colour: lightness as a fraction of white (per channel, what the tint can reach), opacity as a fraction of the tint's
+                float[] f = { 1f, 1f, 1f };
+                if (l >= 0f)
+                {
+                    float want = lin ? Mathf.GammaToLinearSpace(l) : l;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float top = Math.Min(1f, 2f * tl[i] * Math.Max(wk[i], 1e-3f)), fl = Mathf.Clamp01(want / Math.Max(top, 1e-3f));
+                        f[i] = lin ? Mathf.LinearToGammaSpace(fl) : fl;
+                    }
+                }
+                float fa = Mathf.Clamp01(o / om);
+                Func<Color, Color> sc = k => new Color(k.r * f[0], k.g * f[1], k.b * f[2], k.a * fa);
+                var gr = (ParticleSystem.MinMaxGradient)s.Col;
+                ParticleSystem.MinMaxGradient ng;
+                if (gr.mode == ParticleSystemGradientMode.Color) ng = new ParticleSystem.MinMaxGradient(sc(gr.color));
+                else if (gr.mode == ParticleSystemGradientMode.TwoColors) ng = new ParticleSystem.MinMaxGradient(sc(gr.colorMin), sc(gr.colorMax));
+                else return;
+                _mainColor.SetValue(_psMain.GetValue(s.Ps, null), ng, null);
+            }
+            catch { }
+        }
+
+        static readonly Dictionary<int, Color> TexAvg = new Dictionary<int, Color>();
+
+        /// <summary>The smoke's average colour without the tint, in the working colour space: texture (alpha weighted) x start colour x colour over the lifetime (alpha weighted).</summary>
+        static Color SmokeColour(FSys s, Material m)
+        {
+            bool lin = QualitySettings.activeColorSpace == ColorSpace.Linear;
+            Func<Color, Color> w = c => lin ? c.linear : c;
+            Color tex = Color.white;
+            var t = m.mainTexture;
+            if (t != null && !TexAvg.TryGetValue(t.GetInstanceID(), out tex))
+            {
+                tex = Color.white;
+                RenderTexture rt = null; Texture2D rd = null; var prev = RenderTexture.active;
+                try
+                {
+                    rt = RenderTexture.GetTemporary(32, 32, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+                    Graphics.Blit(t, rt);
+                    RenderTexture.active = rt;
+                    rd = new Texture2D(32, 32, TextureFormat.RGBA32, false, true);
+                    rd.ReadPixels(new Rect(0, 0, 32, 32), 0, 0); rd.Apply(false);
+                    float r = 0f, g = 0f, b = 0f, a = 0f;
+                    foreach (var px in rd.GetPixels()) { r += px.r * px.a; g += px.g * px.a; b += px.b * px.a; a += px.a; }
+                    if (a > 1e-3f) tex = new Color(r / a, g / a, b / a, 1f);
+                }
+                catch (Exception e) { Trace("funnel smoke: texture colour not read: " + e.Message); }
+                finally { RenderTexture.active = prev; if (rt != null) RenderTexture.ReleaseTemporary(rt); if (rd != null) UnityEngine.Object.Destroy(rd); }
+                TexAvg[t.GetInstanceID()] = tex;
+                Trace("funnel smoke: texture '" + t.name + "' average colour " + tex);
+            }
+            Color v = Color.white;
+            try
+            {
+                var sc = (ParticleSystem.MinMaxGradient)s.Col;
+                if (sc.mode == ParticleSystemGradientMode.Color) v = w(sc.color);
+                else if (sc.mode == ParticleSystemGradientMode.TwoColors) v = (w(sc.colorMin) + w(sc.colorMax)) * 0.5f;
+                var ps = s.Ps as ParticleSystem;
+                var col = ps == null ? default(ParticleSystem.ColorOverLifetimeModule) : ps.colorOverLifetime;
+                if (ps != null && col.enabled && col.color.mode == ParticleSystemGradientMode.Gradient && col.color.gradient != null)
+                {
+                    float r = 0f, g = 0f, b = 0f, a = 0f;
+                    for (int i = 0; i <= 32; i++) { var e = col.color.gradient.Evaluate(i / 32f); var we = w(e); r += we.r * e.a; g += we.g * e.a; b += we.b * e.a; a += e.a; }
+                    if (a > 1e-3f) v = new Color(v.r * r / a, v.g * g / a, v.b * b / a, 1f);
+                }
+            }
+            catch { }
+            var res = new Color(v.r * tex.r, v.g * tex.g, v.b * tex.b, 1f);
+            var game = new Color(2f * w(s.Tint).r * res.r, 2f * w(s.Tint).g * res.g, 2f * w(s.Tint).b * res.b);
+            Trace("funnel smoke: '" + s.Rend.name + "' smoke colour " + res + ", the game's result " + (lin ? game.gamma : game));
+            return res;
+        }
+
+        static PropertyInfo _colLife, _colLifeOn, _colLifeCol;
+
+        /// <summary>The colour-over-lifetime of a system as the prefab made it (null when it is off or not a gradient).</summary>
+        static object BaseLifeColour(object ps)
+        {
+            try
+            {
+                if (_colLife == null) { _colLife = _tPs.GetProperty("colorOverLifetime"); _colLifeOn = _colLife.PropertyType.GetProperty("enabled"); _colLifeCol = _colLife.PropertyType.GetProperty("color"); }
+                var m = _colLife.GetValue(ps, null);
+                if (!(bool)_colLifeOn.GetValue(m, null)) return null;
+                var c = _colLifeCol.GetValue(m, null);
+                int mode = Convert.ToInt32(_gradMode.GetValue(c, null));
+                return mode == 1 || mode == 3 ? Detached(c) : null;
+            }
+            catch { return null; }
+        }
+
+        static string LifeAlpha(object ps)
+        {
+            try { var b = BaseLifeColour(ps); return b == null ? "-" : Alpha(b).ToString("0.##", CultureInfo.InvariantCulture); } catch { return "?"; }
+        }
+
+        static void SetLifeColour(object ps, object col)
+        {
+            var m = _colLife.GetValue(ps, null);
+            _colLifeCol.SetValue(m, col, null);
+        }
+
+        /// <summary>The group of a ship: the type of the power system in use (a combined plant switches), Electric / AIP / None count as no smoke (Nuclear).</summary>
+        static string GroupOf(object comp)
+        {
+            const BindingFlags all = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            try
+            {
+                if (_cVessel == null) _cVessel = comp.GetType().GetField("_vessel", all);
+                var v = _cVessel == null ? null : _cVessel.GetValue(comp);
+                if (v == null) return "Steam";
+                if (_vInUse == null) _vInUse = FindField(v.GetType(), "_powerSystemInUse");
+                var ps = _vInUse == null ? null : _vInUse.GetValue(v);
+                if (ps == null) return "Steam";
+                if (_psType == null) _psType = ps.GetType().GetProperty("Type", all);
+                string t = Convert.ToString(_psType.GetValue(ps, null));
+                return t == "Diesel" || t == "Steam" || t == "GasTurbine" || t == "Nuclear" ? t : "Nuclear";
+            }
+            catch { return "Steam"; }
+        }
+
+        static FieldInfo FindField(Type t, string name)
+        {
+            for (; t != null; t = t.BaseType) { var f = t.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly); if (f != null) return f; }
+            return null;
+        }
+
+        static PropertyInfo _vCmd, _cmdValue; static MethodInfo _cmdDemanded;
+
+        /// <summary>The speed the ship is ordered to make, knots (-1 when it cannot be read).</summary>
+        static float Demanded(object v)
+        {
+            try
+            {
+                const BindingFlags all = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+                if (_vCmd == null) _vCmd = v.GetType().GetProperty("SpeedCommand", all);
+                var cmd = _vCmd == null ? null : _vCmd.GetValue(v, null);
+                if (cmd == null) return -1f;
+                if (_cmdValue == null) _cmdValue = cmd.GetType().GetProperty("Value", all);
+                var val = _cmdValue == null ? null : _cmdValue.GetValue(cmd, null);
+                if (val == null) return -1f;
+                if (_cmdDemanded == null) _cmdDemanded = val.GetType().GetMethod("GetDemandedSpeedInKnots", all);
+                return _cmdDemanded == null ? -1f : Convert.ToSingle(_cmdDemanded.Invoke(val, new object[] { v }));
+            }
+            catch { return -1f; }
+        }
+
+        /// <summary>The load of the plant, 0..1: the speed over the maximum speed; a ship that is speeding up (ordered speed above the real one) counts as at full power.</summary>
+        static float Load(object comp)
+        {
+            const BindingFlags all = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            try
+            {
+                var v = _cVessel == null ? null : _cVessel.GetValue(comp);
+                if (v == null) return 0f;
+                if (_vVel == null) { _vVel = FindField(v.GetType(), "_velocityInKnots"); _vMaxSpeed = v.GetType().GetProperty("MaxForwardSpeedInKnots", all); }
+                if (_vVel == null || _vMaxSpeed == null) return 0f;
+                float max = Convert.ToSingle(_vMaxSpeed.GetValue(v, null));
+                float speed = Math.Abs(Convert.ToSingle(_vVel.GetValue(v)));
+                if (max <= 0.1f) return 0f;
+                float want = Demanded(v);
+                if (want > speed + Math.Max(0.5f, 0.03f * max)) return 1f;   // speeding up: full power
+                return Mathf.Clamp01(speed / max);
+            }
+            catch { return 0f; }
+        }
+
+        /// <summary>
+        /// Nuclear + oil-fired boost: the nuclear plant alone drives the ship up to the speed of the full-ahead telegraph (4/5 of the maximum), the oil-fired
+        /// boilers are lit only above it. 0 up to that speed, 1 at the maximum; a flank speed ordered while the ship is still speeding up counts as 1.
+        /// </summary>
+        static float BoostLoad(object comp)
+        {
+            const BindingFlags all = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            try
+            {
+                var v = _cVessel == null ? null : _cVessel.GetValue(comp);
+                if (v == null) return 0f;
+                if (_vVel == null) { _vVel = FindField(v.GetType(), "_velocityInKnots"); _vMaxSpeed = v.GetType().GetProperty("MaxForwardSpeedInKnots", all); }
+                if (_vVel == null || _vMaxSpeed == null) return 0f;
+                float max = Convert.ToSingle(_vMaxSpeed.GetValue(v, null)), speed = Math.Abs(Convert.ToSingle(_vVel.GetValue(v)));
+                if (max <= 0.1f) return 0f;
+                float full = 0.8f * max;                                   // the full-ahead telegraph (4 of 5)
+                float want = Demanded(v);
+                if (want > full + 0.03f * max && want > speed + Math.Max(0.5f, 0.03f * max)) return 1f;   // flank ordered, speeding up
+                return Mathf.Clamp01((speed - full) / Math.Max(0.01f, max - full));
+            }
+            catch { return 0f; }
+        }
+
+        /// <summary>The start colour with its colour channels x rgb (clamped) and alpha x a, from the colour as the prefab made it.</summary>
+        static object Tinted(object grad, float rgb, float a)
+        {
+            int mode = Convert.ToInt32(_gradMode.GetValue(grad, null));
+            object g2 = CopyStruct(grad);
+            if (mode == 0) _gradColor.SetValue(g2, Tint((Color)_gradColor.GetValue(grad, null), rgb, a), null);
+            else if (mode == 2 && _gradMin != null && _gradMax != null) { _gradMin.SetValue(g2, Tint((Color)_gradMin.GetValue(grad, null), rgb, a), null); _gradMax.SetValue(g2, Tint((Color)_gradMax.GetValue(grad, null), rgb, a), null); }
+            else if (mode == 1 && _gradG != null) _gradG.SetValue(g2, Tint(_gradG.GetValue(grad, null) as Gradient, rgb, a), null);
+            else if (mode == 3 && _gradGMin != null && _gradGMax != null) { _gradGMin.SetValue(g2, Tint(_gradGMin.GetValue(grad, null) as Gradient, rgb, a), null); _gradGMax.SetValue(g2, Tint(_gradGMax.GetValue(grad, null) as Gradient, rgb, a), null); }
+            return g2;
+        }
+
+        static Color Tint(Color c, float rgb, float a) { return new Color(Mathf.Clamp01(c.r * rgb), Mathf.Clamp01(c.g * rgb), Mathf.Clamp01(c.b * rgb), Mathf.Clamp01(c.a * a)); }
+
+        static Gradient Tint(Gradient g, float rgb, float a)
+        {
+            if (g == null) return null;
+            var ck = g.colorKeys; var ak = g.alphaKeys;
+            for (int i = 0; i < ck.Length; i++) ck[i].color = Tint(ck[i].color, rgb, 1f);
+            for (int i = 0; i < ak.Length; i++) ak[i].alpha = Mathf.Clamp01(ak[i].alpha * a);
+            var r = new Gradient { mode = g.mode };
+            r.SetKeys(ck, ak);
+            return r;
+        }
+
+        static readonly HashSet<string> DumpedFunnel = new HashSet<string>();
+        static FieldInfo _cVp, _vpFunnel, _vpName, _vpHp;
+
+        /// <summary>Debug: the funnel smoke of a ship (once per ship class) - how its prefab emits and what colour it starts with (to tune it by engine type and load).</summary>
+        static void DumpFunnel(object comp)
+        {
+            try
+            {
+                const BindingFlags all = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+                if (_cVp == null) _cVp = comp.GetType().GetField("_vp", all);
+                var vp = _cVp == null ? null : _cVp.GetValue(comp);
+                if (vp == null) return;
+                if (_vpFunnel == null) { _vpFunnel = vp.GetType().GetField("_funnelSmoke", all); _vpName = vp.GetType().GetField("_objectIniName", all); _vpHp = vp.GetType().GetField("_horsePower", all); }
+                var ps = _vpFunnel == null ? null : _vpFunnel.GetValue(vp) as Component;
+                string name = _vpName == null ? "?" : Convert.ToString(_vpName.GetValue(vp));
+                if (ps == null || !DumpedFunnel.Add(name)) return;
+                var sb = new System.Text.StringBuilder("funnel smoke of '" + name + "' (hp " + (_vpHp == null ? "?" : Convert.ToString(_vpHp.GetValue(vp))) + "), object '" + ps.gameObject.name + "':");
+                foreach (var c in ps.gameObject.GetComponentsInChildren(ps.GetType(), true))
+                {
+                    object main = P(c, "main"), em = P(c, "emission"), col = P(main, "startColor");
+                    sb.Append("\n  PS '").Append(((Component)c).name).Append("' rate ").Append(P(em, "rateOverTimeMultiplier")).Append(" dist ").Append(P(em, "rateOverDistanceMultiplier"))
+                      .Append(" bursts ").Append(P(em, "burstCount")).Append(" size ").Append(P(main, "startSizeMultiplier")).Append(" life ").Append(P(main, "startLifetimeMultiplier"))
+                      .Append(" speed ").Append(P(main, "startSpeedMultiplier")).Append(" max ").Append(P(main, "maxParticles")).Append(" space ").Append(P(main, "simulationSpace"))
+                      .Append(" colour mode ").Append(P(col, "mode")).Append(" ").Append(P(col, "color")).Append(" ").Append(P(col, "colorMin")).Append(" ").Append(P(col, "colorMax"))
+                      .Append(" colorOverLifetime ").Append(P(P(c, "colorOverLifetime"), "enabled")).Append(" (max alpha ").Append(LifeAlpha(c)).Append(")");
+                    DumpMaterial(sb, ((Component)c).GetComponent<Renderer>());
+                }
+                Trace(sb.ToString());
+            }
+            catch (Exception e) { Trace("FireSmoke.DumpFunnel: " + e.Message); }
         }
 
         static object P(object o, string name)

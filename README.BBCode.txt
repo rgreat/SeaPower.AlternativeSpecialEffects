@@ -1,6 +1,6 @@
-Version 1.1.0.
+Version 1.2.0.
 
-Special effects of the 3D picture in one mod with its own settings window: lights, fires, smoke, guns and optics. Takes over the effects that were spread over Alternative Weapons Control, Alternative Damage Model and the rgreat Cumulative Pack.
+Special effects of the 3D picture in one mod with its own settings window: lights, fires, smoke and guns. Takes over the effects that were spread over Alternative Weapons Control, Alternative Damage Model and the rgreat Cumulative Pack.
 
 [h1]Features[/h1]
 [h3]Lights[/h3]
@@ -14,10 +14,10 @@ Special effects of the 3D picture in one mod with its own settings window: light
 [olist]
 [*][b]Fire and smoke points by ship length[/b] (1 / 2 / 3 / 5 instead of the game's three), each showing the fire of its own section.
 [*][b]The look of a fire by its strength:[/b] thresholds of small / moderate / severe fire and the smoke opacity are settings.
-[*][b]Fires of one ship differ:[/b] neighbouring fires get their own random seed and start moment, so they no longer animate identically (e.g. after a saved game is loaded).
-[*][b]Smoke order:[/b] columns of smoke of one ship overlap in the right order.
+[*][b]Funnel smoke by engine type:[/b] groups Diesel, Steam, GasTurbine, Nuclear and Combined (nuclear + oil-fired boost, smokes only above the full-ahead speed), each with its own density, lightness (black to white), thickness and duration from idle to full power, all editable; a change of the engine mode affects only the new particles. Any single ship or country can get its own multipliers (tabs Ships and Countries); [b]funnel_groups.txt[/b] forces a ship into another group.
+[*][b]Smoke order:[/b] columns of smoke of one ship overlap in the right order; smoke and clouds overlap in the right order; the smoke does not change its colour sharply at the horizon.
 [*][b]Fire and smoke density:[/b] a multiplier of the number of emitted particles (1 = as in the game).
-[*][b]Smoke lasts longer:[/b] the smoke part of the fire animation runs slower, so the smoke thins out later (10x by default, adjustable; the flames keep the game's speed).
+[*][b]Smoke lasts longer:[/b] the smoke part of the fire animation runs slower, so the smoke thins out later (5x by default, adjustable; the flames keep the game's speed; late sprites grow and fade).
 [*][b]Wreck effect timer:[/b] the effect of a sinking wreck stops after N minutes of game time, also after a saved game is loaded.
 [/olist]
 
@@ -27,16 +27,15 @@ Special effects of the 3D picture in one mod with its own settings window: light
 [*][b]Machine guns:[/b] tracers and the muzzle burst sound last for the whole burst. Gun hit sound fix.
 [/olist]
 
-[h3]View and optics[/h3]
+[h3]View[/h3]
 [olist]
 [*][b]Blinking red lights on life rafts[/b] (own switch, works at once).
-[*][b]Binoculars[/b] start in the normal view at maximum zoom, with no night or thermal filter by default (option: only by day).
 [*][b]Unobserved targets:[/b] targets of other sides that are not seen visually are not drawn in 3D, with their wakes (fading out by themselves) and sonar cables. The camera does not centre on or follow them and returns to the selected one when it becomes visible (off by default; submarines are included only with a separate option, also off).
 [/olist]
 
 [h3]Settings and languages[/h3]
 [olist]
-[*]Settings window in the game with tabs: Lights, Fires and Smoke, World, Guns, Debug, Language. Opens from the main menu (under Mod Manager) and from the pause menu (Esc, under Options). With several of the author's mods installed there is one [b]Alternative Mods[/b] button that lists them.
+[*]Settings window in the game with tabs: Lights, Fires and Smoke, World, Guns, Funnel Smoke (pages General, Engine types, Ships, Countries), Debug, Language. Opens from the main menu (under Mod Manager) and from the pause menu (Esc, under Options). With several of the author's mods installed there is one [b]Alternative Mods[/b] button that lists them.
 [*]On the first start the values of the same options are taken from the old Alternative Weapons Control and Alternative Damage Model settings.
 [*]Localized into 9 languages (en, ru, cn, de, es, fr, ko, ja, vn). The [b]lang/<code>.ini[/b] files can be edited to translate or change texts.
 [/olist]

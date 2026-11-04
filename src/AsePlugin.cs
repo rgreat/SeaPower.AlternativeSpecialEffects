@@ -24,7 +24,7 @@ namespace AlternativeSpecialEffects
     {
         public const string PluginGuid = "com.rgreat.seapower.alternativespecialeffects";
         public const string PluginName = "Alternative Special Effects";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.2.0";
 
         public static readonly string BuildId = ReadBuildId();
 
@@ -40,9 +40,14 @@ namespace AlternativeSpecialEffects
         // ------------------------------------------------------------ settings
         public ConfigFile Cfg;
         internal ConfigEntry<string> _language;
-        internal ConfigEntry<bool> _debugEntry, _flashLimit, _flashMissile, _fireFlicker, _optNormal, _optDayOnly, _flashMuzzle, _flashHit,
-                                   _mgBurstFix, _mgSoundLoop, _hitSoundFix, _smoke, _density, _smokeSort, _hide3d, _hideSubs, _gunHits, _raftLights;
-        internal ConfigEntry<float> _flashPower, _firePower, _dayBright, _densityMin, _densityEnd, _smokeMod, _smokeSev, _smokeLife, _smokeShare, _smokeDens, _bubbles;
+        internal ConfigEntry<bool> _gradeNoMask;
+        internal ConfigEntry<bool> _camOffColor, _camOffUnderwater, _camOffOcclusion, _camOffBloom;
+        internal ConfigEntry<bool> _debugEntry, _flashLimit, _flashMissile, _fireFlicker, _flashMuzzle, _flashHit,
+                                   _mgBurstFix, _mgSoundLoop, _hitSoundFix, _smoke, _density, _smokeSort, _smokeCloud, _smokeKeep, _hide3d, _hideSubs, _gunHits, _raftLights;
+        internal ConfigEntry<bool> _funnelOn; internal ConfigEntry<float> _funnelGlobal, _funnelGlobalThick, _funnelPowExp, _funnelPowRef, _funnelSizeExp;
+        ConfigEntry<string> _funnelShips, _funnelNations;
+        internal readonly Dictionary<string, ConfigEntry<float>[]> _funnel = new Dictionary<string, ConfigEntry<float>[]>();
+        internal ConfigEntry<float> _flashPower, _firePower, _dayBright, _densityMin, _densityEnd, _smokeMod, _smokeSev, _smokeLife, _smokeShare, _smokeGrow, _smokeFade, _smokeDens, _bubbles;
         public static string UserDir { get; private set; }
         internal bool CfgIsNew;                         // the settings file did not exist: the old mods' values are taken over
 
@@ -125,10 +130,35 @@ namespace AlternativeSpecialEffects
             _densityMin = Cfg.Bind("Effects", "SmokeStartOpacity", 10f, "Small fire: smoke opacity of new particles at 0% of the fire's maximum, % of the game's.");
             _densityEnd = Cfg.Bind("Effects", "SmokeEndOpacity", 100f, "Small fire: smoke opacity of new particles at SmokeModerateFrom, % of the game's; between - evenly by the fire's strength.");
             _smokeMod = Cfg.Bind("Effects", "SmokeModerateFrom", 50f, "The moderate fire's look from this strength, % of the fire's maximum (the game: 25%).");
-            _smokeLife = Cfg.Bind("Effects", "SmokeLifetimeFactor", 10f, "Ship fire smoke lasts this many times longer before it thins out (1 = as in the game).");
-            _smokeShare = Cfg.Bind("Effects", "SmokeFireShare", 50f, "Ship fire sprite animation: the first part, % of its length, has the flames in it and keeps the game's speed; only the rest (smoke) is slowed by SmokeLifetimeFactor.");
+            _smokeLife = Cfg.Bind("Effects", "SmokeLifetimeFactor", 5f, "Ship fire smoke lasts this many times longer before it thins out (1 = as in the game).");
+            _smokeShare = Cfg.Bind("Effects", "SmokeFireShare", 30f, "Ship fire sprite animation: the first part, % of its length, has the flames in it and keeps the game's speed; only the rest (smoke) is slowed by SmokeLifetimeFactor.");
+            _smokeGrow = Cfg.Bind("Effects", "SmokeSpreadGrowth", 100f, "Ship fire smoke: on the slowed part of a particle's life its sprite grows, % of how much farther apart the sprites fly than in the game (0 = the game's size; 100 = in proportion).");
+            _smokeFade = Cfg.Bind("Effects", "SmokeSpreadFade", 200f, "Ship fire smoke: the growing sprites get more transparent, % (100 = the opacity falls as the size grows; 0 = the game's opacity).");
+            _smokeKeep = Cfg.Bind("Effects", "SmokeKeepOnStop", true, "When a fire changes its stage or goes out, the smoke already in the air stays and fades out; only new particles stop. Off = the game erases it at once.");
+            _smokeCloud = Cfg.Bind("Effects", "SmokeAfterClouds", true, "Smoke (fires and funnels) and clouds overlap in the right order: before each frame every smoke column is put in front of or behind the clouds by where the cloud layer is on the line from the camera to it (the game sorts a whole cloud cell, kilometres wide, by its centre, so clouds behind a ship could cover its smoke). Off = as in the game.");
             _smokeSort = Cfg.Bind("Effects", "SmokeSortFix", true, "Columns of smoke of one ship overlap in the right order: each smoke system is sorted by the distance to its fire point, not to its bounds' centre (a tall plume's centre is high up). Off = as in the game.");
             _smokeDens = Cfg.Bind("Effects", "SmokeDensityFactor", 2f, "Density of the ship fire and smoke: the number of particles they emit is multiplied by this (1 = as in the game; default 2). Nothing else changes.");
+            _funnelOn = Cfg.Bind("FunnelSmoke", "Enabled", true, "Funnel smoke of ships follows the engine type and the load: its density, lightness and thickness are set by the group below (Diesel, Steam, GasTurbine, Nuclear, Combined). A ship's group is its power system in use; funnel_groups.txt (next to the dll) forces a ship into another group. Off = as in the game.");
+            _funnelGlobal = Cfg.Bind("FunnelSmoke", "GlobalDensity", 1f, "Number of funnel smoke particles of all ships, x of the game's; the groups' own values are multiplied by this. More particles cost speed: prefer GlobalThickness.");
+            _funnelPowExp = Cfg.Bind("FunnelSmoke", "PowerExponent", 0.5f, "Smoke amount by the engines' power: x (horsepower / PowerReference) ^ this, limited to 1..2: a small ship keeps the game's amount, a large one gets up to twice as much. 0 = the game's amount for every ship.");
+            _funnelSizeExp = Cfg.Bind("FunnelSmoke", "SizeByPower", 1f, "Size of the smoke particles by the engines' power: x (horsepower / PowerReference) ^ this. A larger ship gets bigger particles at the start, a smaller one smaller particles at the end of their life. 0 = the game's size.");
+            _funnelPowRef = Cfg.Bind("FunnelSmoke", "PowerReference", 50000f, "The horsepower at which the smoke amount is the group's own (not changed by PowerExponent).");
+            _funnelGlobalThick = Cfg.Bind("FunnelSmoke", "GlobalThickness", 5f, "Thickness (opacity of the particles) of the funnel smoke of all ships, x of the game's; the groups' own values are multiplied by this. Costs no speed.");
+            _funnelShips = Cfg.Bind("FunnelSmoke", "Ships", "usn_cv_forrestal_75=1,1,1.5,1; usn_cv_america_79=1,1,1.5,1; usn_cv_kitty_hawk=1,1,1.5,1", "Single ships: \"ini_name=particles,duration,lightness,thickness; ...\" - multipliers of the group's values of that ship's funnel smoke (particle amount, duration, lightness, thickness; 1 = the group's). Edit them in the Ships tab.");
+            _funnelNations = Cfg.Bind("FunnelSmoke", "Nations", "Soviet=1,1,1,1.5; US=1,0.75,1,0.5; China=1,1,1,1.5", "Countries: \"nation=particles,duration,lightness,thickness; ...\" (Nation= of the ship's ini: US, Soviet, Japan ...) - multipliers of the group's values of the funnel smoke of all ships of the country; multiplied by the ship's own ones (Ships). Edit them in the Nations tab.");
+            foreach (var kv in new Dictionary<string, float[]> { { "Diesel", new float[] { 1f, 2f, 25f, 15f, 0.35f, 1.5f, 0.1f, 0.3f } }, { "Steam", new float[] { 0.5f, 1.5f, 30f, 15f, 0.5f, 2f, 0.25f, 0.4f } }, { "GasTurbine", new float[] { 1f, 2f, 50f, 45f, 0.5f, 1f, 0.1f, 0.3f } }, { "Nuclear", new float[] { 0.2f, 0.4f, 80f, 80f, 0f, 0.3f, 0.1f, 0.3f } }, { "Combined", new float[] { 0.5f, 1.5f, 30f, 15f, 0.5f, 2f, 1f, 1f } } })
+            {
+                var e = new ConfigEntry<float>[8];
+                e[0] = Cfg.Bind("FunnelSmoke", kv.Key + "DensityIdle", kv.Value[0], "Amount of funnel smoke particles of this group at low speed, x of the game's.");
+                e[1] = Cfg.Bind("FunnelSmoke", kv.Key + "DensityFull", kv.Value[1], "Amount of funnel smoke particles of this group at full power, x of the game's; between - evenly by the speed (a ship that is speeding up counts as at full power).");
+                e[2] = Cfg.Bind("FunnelSmoke", kv.Key + "LightIdle", kv.Value[2], "Lightness of the funnel smoke of this group at low speed, %: 0 = black, 100 = white (a neutral grey; the game's smoke is a dark brownish one).");
+                e[3] = Cfg.Bind("FunnelSmoke", kv.Key + "LightFull", kv.Value[3], "Lightness of the funnel smoke of this group at full speed, %: 0 = black, 100 = white.");
+                e[4] = Cfg.Bind("FunnelSmoke", kv.Key + "ThicknessIdle", kv.Value[4], "Thickness of the funnel smoke of this group at low speed (how dense it looks), x of the game's; over 1 makes it denser.");
+                e[5] = Cfg.Bind("FunnelSmoke", kv.Key + "ThicknessFull", kv.Value[5], "Thickness of the funnel smoke of this group at full speed (how dense it looks), x of the game's; between - evenly by the speed.");
+                e[6] = Cfg.Bind("FunnelSmoke", kv.Key + "LifeIdle", kv.Value[6], "How long the funnel smoke of this group lasts at low speed, x of the game's (the lifetime of its particles; it also makes the plume longer). Only new particles change.");
+                e[7] = Cfg.Bind("FunnelSmoke", kv.Key + "LifeFull", kv.Value[7], "How long the funnel smoke of this group lasts at full speed, x of the game's; between - evenly by the speed. Only new particles change.");
+                _funnel[kv.Key] = e;
+            }
             _smokeSev = Cfg.Bind("Effects", "SmokeSevereFrom", 90f, "The severe fire's look from this strength, % of the fire's maximum (the game: 50%).");
             _gunHits = Cfg.Bind("Effects", "GunHitEffects", true,
                 "More visible and spectacular hits of gun shells (calibres from 37 mm up): the hit effects of 47 gun ammunition files are replaced (hit_effects.txt of the mod, from the rgreat cumulative pack). " +
@@ -138,26 +168,31 @@ namespace AlternativeSpecialEffects
             _bubbles = Cfg.Bind("Effects", "BubblesStopMinutes", 10f,
                 "Minutes (game time, so time compression counts) after a ship starts to sink, when its sinking-bubbles effect stops emitting " +
                 "(the game never stops it while the wreck exists). Saves resources in long missions. 0 = never, as in the game.");
+            _gradeNoMask = Cfg.Bind("Effects", "ColourGradingNoDepthMask", true, "The game's colour grading depends on the depth behind a pixel; smoke has no depth of its own, so it changed its colour sharply at the horizon (brown over the sea, grey over the sky). On: the same grading everywhere. Off = as in the game.");
             _hide3d = Cfg.Bind("UI", "HideUnobservedTargets3D", false,
                 "Do not draw in the 3D view the targets of other sides that are not observed visually (known by radar, sonar or data only). Your own units are always drawn.");
             _hideSubs = Cfg.Bind("UI", "HideUnobservedSubmarines3D", false,
                 "With HideUnobservedTargets3D on, submarines are hidden too. Off: submarines are always drawn (they are almost never seen visually). Only counts when HideUnobservedTargets3D is on.");
-            _optNormal = Cfg.Bind("Optics", "BinocularsNormalView", true, "Binoculars at the maximum magnification start with the normal view (the game starts them with its night / thermal filter on). The game's filter key switches the filter on.");
-            _optDayOnly = Cfg.Bind("Optics", "NormalViewDayOnly", true, "The normal view is the default only by day; at night the game's own default filter stays.");
             _mgBurstFix = Cfg.Bind("Guns", "MachineGunBurstFix", true, "Machine guns show their muzzle burst on every shot: a pooled burst effect that is still playing is restarted.");
             _mgSoundLoop = Cfg.Bind("Guns", "MachineGunSoundLoopFix", true, "The looped fire sound of machine guns skips the silent part of its clip (a gap in the middle of a long burst).");
             _hitSoundFix = Cfg.Bind("Guns", "HitSoundFix", true, "Gun hits always play their explosion sound: an effect whose sound did not start (pooled instance) is made to play it.");
+            _camOffColor = Cfg.Bind("Debug", "CamOffColor", false, "Debug, for finding what changes the smoke colour at the horizon: switches this camera effect of the game off while it is on. Not saved into the game's options.");
+            _camOffUnderwater = Cfg.Bind("Debug", "CamOffUnderwater", false, "Debug, for finding what changes the smoke colour at the horizon: switches this camera effect of the game off while it is on. Not saved into the game's options.");
+            _camOffOcclusion = Cfg.Bind("Debug", "CamOffOcclusion", false, "Debug, for finding what changes the smoke colour at the horizon: switches this camera effect of the game off while it is on. Not saved into the game's options.");
+            _camOffBloom = Cfg.Bind("Debug", "CamOffBloom", false, "Debug, for finding what changes the smoke colour at the horizon: switches this camera effect of the game off while it is on. Not saved into the game's options.");
             _debugEntry = Cfg.Bind("General", "Debug", false, "Verbose logging and BepInEx/AlternativeSpecialEffects.trace.txt.");
             _language = Cfg.Bind("General", "Language", "",
                 "Language of the mod's texts: a code of a game language (en, ru ...); empty = the game's own language. The texts are in the files lang/<code>.ini in the mod folder - edit them to translate.");
 
             // the order of the window's fields is the table in SettingsWindow; this list is what it loads and saves
             foreach (var en in new ConfigEntryBase[] { _flashMuzzle, _flashHit, _flashMissile, _flashPower, _flashLimit, _dayBright, _fireFlicker, _firePower,
-                                                        _gunHits, _raftLights, _smoke, _density, _smokeSort, _smokeDens, _densityMin, _densityEnd, _smokeMod, _smokeSev, _smokeLife, _smokeShare, _bubbles, _hide3d, _hideSubs, _optNormal, _optDayOnly,
-                                                        _mgBurstFix, _mgSoundLoop, _hitSoundFix, _debugEntry, _language })
+                                                        _gunHits, _raftLights, _smoke, _density, _smokeSort, _smokeCloud, _smokeKeep, _smokeDens, _densityMin, _densityEnd, _smokeMod, _smokeSev, _smokeLife, _smokeShare, _smokeGrow, _smokeFade, _bubbles, _hide3d, _hideSubs,
+                                                        _mgBurstFix, _mgSoundLoop, _hitSoundFix, _gradeNoMask, _debugEntry, _camOffColor, _camOffUnderwater, _camOffOcclusion, _camOffBloom, _language })
                 Entries.Add(en);
 
             Loc.Trace = Trace; Loc.Forced = () => _language == null ? "" : _language.Value;
+            Entries.Add(_funnelOn); Entries.Add(_funnelGlobal); Entries.Add(_funnelGlobalThick); Entries.Add(_funnelPowExp); Entries.Add(_funnelPowRef); Entries.Add(_funnelSizeExp); Entries.Add(_funnelShips); Entries.Add(_funnelNations);
+            foreach (var kv in _funnel) foreach (var e in kv.Value) Entries.Add(e);
             foreach (var en in Entries) Loc.Register("help." + en.Definition.Section + "/" + en.Definition.Key, en.Description == null ? "" : en.Description.Description);
 
             if (CfgIsNew) { try { Migrate.FromOldMods(this); } catch (Exception e) { Logger.LogWarning("Taking over the old mods' settings failed: " + e.Message); } }
@@ -194,7 +229,13 @@ namespace AlternativeSpecialEffects
             RaftLights.Trace = Trace; RaftLights.Want = () => Enabled && _raftLights.Value;
             FireSmoke.Trace = Trace; FireSmoke.Verbose = () => _debug;
             FireSmoke.IsEnabled = () => Enabled && _smoke.Value;
-            FireSmoke.SortFix = () => Enabled && _smokeSort.Value;
+            FireSmoke.FunnelGlobal = () => _funnelGlobal.Value;
+            FireSmoke.FunnelGlobalThick = () => _funnelGlobalThick.Value; FireSmoke.FunnelPowerExp = () => _funnelPowExp.Value; FireSmoke.FunnelPowerRef = () => _funnelPowRef.Value; FireSmoke.FunnelSizeExp = () => _funnelSizeExp.Value;
+            FireSmoke.FunnelOn = () => Enabled && _funnelOn.Value;
+            FireSmoke.FunnelNation = n => { var l = ShipFunnel.Parse(_funnelNations.Value); foreach (var it in l) if (string.Equals(it.Ini, n, StringComparison.OrdinalIgnoreCase)) return new[] { it.Particles, it.Duration, it.Lightness, it.Thickness }; return null; };
+            FireSmoke.FunnelShip = ini => { var l = ShipFunnel.Parse(_funnelShips.Value); foreach (var it in l) if (string.Equals(it.Ini, ini, StringComparison.OrdinalIgnoreCase)) return new[] { it.Particles, it.Duration, it.Lightness, it.Thickness }; return null; };
+            FireSmoke.FunnelGroup = g => { ConfigEntry<float>[] e; if (!_funnel.TryGetValue(g, out e)) return null; return new[] { e[0].Value, e[1].Value, e[2].Value / 100f, e[3].Value / 100f, e[4].Value, e[5].Value, e[6].Value, e[7].Value }; };
+            FireSmoke.SortFix = () => Enabled && _smokeSort.Value; FireSmoke.AfterClouds = () => Enabled && _smokeCloud.Value; FireSmoke.KeepOnStop = () => Enabled && _smokeKeep.Value;
             FireSmoke.DensityFactor = () => Enabled ? Math.Max(0f, Math.Min(100f, _smokeDens.Value)) : 1f;
             FireSmoke.LifeFactor = () => Enabled ? Math.Max(1f, Math.Min(100f, _smokeLife.Value)) : 1f;
             FireSmoke.DensityOn = () => Enabled && _density.Value;
@@ -206,11 +247,15 @@ namespace AlternativeSpecialEffects
         /// <summary>Settings (or the Mods tick) changed: the values the modules read as plain numbers, and the effects that must be undone.</summary>
         void ApplySettings()
         {
+            FireSmoke.CamOff = () => { var l = new List<string>(); if (_camOffColor.Value) l.Add("AmplifyColorEffect"); if (_camOffUnderwater.Value) l.Add("UnderWaterPostEffect"); if (_camOffOcclusion.Value) l.Add("AmplifyOcclusionEffect"); if (_camOffBloom.Value) l.Add("AmplifyBloomEffect"); return l; };
+            FireSmoke.CamOffVersion++;
+            ColourGrading.NoDepthMask = () => Enabled && _gradeNoMask.Value;
             HitEffects.Sync(); RaftLights.Sync();
             FireSmoke.StartOpacity = Pct(_densityMin.Value, 0f, 100f);
             FireSmoke.EndOpacity = Pct(_densityEnd.Value, 0f, 100f);
             FireSmoke.ModerateFrom = Pct(_smokeMod.Value, 1f, 100f);
             FireSmoke.FireShare = Pct(_smokeShare.Value, 5f, 95f);
+            FireSmoke.SpreadGrow = Pct(_smokeGrow.Value, 0f, 200f); FireSmoke.SpreadFade = Pct(_smokeFade.Value, 0f, 300f);
             FireSmoke.SevereFrom = Math.Max(FireSmoke.ModerateFrom, Pct(_smokeSev.Value, 1f, 100f));
             try { if (!(Enabled && _hide3d.Value)) HideUnseen.RestoreAll(); else if (!_hideSubs.Value) HideUnseen.RestoreSubmarines(); } catch (Exception e) { Trace("RestoreAll: " + e.Message); }
         }
@@ -249,9 +294,10 @@ namespace AlternativeSpecialEffects
         static void SmokeFireStatePostfix(object __instance) { try { FireSmoke.AfterUpdateFireState(__instance); } catch (Exception e) { Trace("SmokeFireState: " + e.Message); } }
         static void SmokeCreatePostfix(object __instance, object fireEffect)
         {
-            try { FireSmoke.Prolong(fireEffect); FireSmoke.Scatter(__instance, fireEffect); } catch (Exception e) { Trace("SmokeScatter: " + e.Message); }
-            if (_debug) { try { FireSmoke.DumpEffect(fireEffect); } catch { } }
+            if (_debug) { try { FireSmoke.DumpEffect(fireEffect); } catch { } }   // before our changes: the game's own values
+            try { FireSmoke.Prolong(fireEffect); FireSmoke.RandomSeed(fireEffect); } catch (Exception e) { Trace("SmokeCreate: " + e.Message); }
         }
+        static IEnumerable<CodeInstruction> SmokeDeactivateTranspiler(IEnumerable<CodeInstruction> ins) { return FireSmoke.DeactivateTranspiler(ins); }
         static IEnumerable<CodeInstruction> SmokeCreateTranspiler(IEnumerable<CodeInstruction> ins) { return FireSmoke.CreateFireEffectTranspiler(ins); }
 
         /// <summary>Once a second per ship (the game's own fixed update of its compartments): the look of the fire by its strength.</summary>
@@ -272,11 +318,11 @@ namespace AlternativeSpecialEffects
             var harmony = new Harmony(PluginGuid);
             const BindingFlags all = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
             try { HookFireFlicker(harmony, asm); } catch (Exception e) { Warn("Fire flicker failed: " + e.Message); }
-            try { HookOptics(harmony, asm); } catch (Exception e) { Warn("Binocular view failed: " + e.Message); }
             try { if (!HitEffects.Init(harmony, asm)) Warn("Gun hit effects: game members not found; the game's own hit effects stay."); } catch (Exception e) { Warn("Gun hit effects failed: " + e.Message); }
             try { if (!RaftLights.Init(harmony, asm)) Warn("Life raft lights: game members not found; the lights cannot be switched."); } catch (Exception e) { Warn("Life raft lights failed: " + e.Message); }
             try { HookEffectsGuns(harmony, asm); } catch (Exception e) { Warn("Gun effects failed: " + e.Message); }
             try { if (!BubblesOff.Init(harmony, asm)) Warn("Sinking bubbles: game members not found; they are not stopped."); } catch (Exception e) { Warn("Sinking bubbles failed: " + e.Message); }
+            try { if (!ColourGrading.Init(harmony, asm)) Warn("Colour grading: game members not found."); } catch (Exception e) { Warn("Colour grading failed: " + e.Message); }
             try { if (!HideUnseen.Init(harmony, asm)) Warn("Hide unobserved targets: game members not found."); } catch (Exception e) { Warn("Hide unobserved targets failed: " + e.Message); }
             try
             {
@@ -286,6 +332,10 @@ namespace AlternativeSpecialEffects
                     harmony.Patch(tComp.GetMethod("Init", all), postfix: Hm("SmokeInitPostfix"));
                     harmony.Patch(tComp.GetMethod("UpdateFireState", all), postfix: Hm("SmokeFireStatePostfix"));
                     harmony.Patch(tComp.GetMethod("CreateFireEffect", all), postfix: Hm("SmokeCreatePostfix"), transpiler: Hm("SmokeCreateTranspiler"));
+                    var tFe = asm.GetType("SeaPower.Compartments+FireEffect");
+                    var deact = tFe != null ? tFe.GetMethod("Deactivate", all) : null;
+                    if (deact != null) harmony.Patch(deact, transpiler: Hm("SmokeDeactivateTranspiler"));
+                    else Warn("FireEffect.Deactivate not found: the game erases live fire smoke on a stage change.");
                     var fixedUpdate = tComp.GetMethod("OnFixedUpdate", all);
                     if (fixedUpdate != null) harmony.Patch(fixedUpdate, prefix: Hm("SmokeTickPrefix"));
                     else Warn("Compartments.OnFixedUpdate not found: the fire look by strength is not updated.");

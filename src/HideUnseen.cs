@@ -27,6 +27,7 @@ namespace AlternativeSpecialEffects
 
         static Func<object, object> _vObject, _vSide, _sDetected, _sHost, _oTaskforce, _gPlayerTf;
         static PropertyInfo _oPlayer;
+        static PropertyInfo _optInstance, _optHide; static Func<object, object> _gEnemyCtl; static PropertyInfo _rpValue;   // the F10 menu's cheat switches
         static bool _ok;
         static int _scanLogged;
         static Func<object, object> _oType;
@@ -59,6 +60,14 @@ namespace AlternativeSpecialEffects
                 _oTaskforce = Acc(tObj, "_taskforce");
                 _oPlayer = tObj == null ? null : tObj.GetProperty("IsPlayerObject", all);
                 _gPlayerTf = Acc(tGlobals, "_playerTaskforce");
+                try
+                {
+                    var tOpt = asm.GetType("SeaPower.OptionsManager"); var tSing = asm.GetType("SeaPower.Singleton`1");
+                    _optInstance = tSing.MakeGenericType(tOpt).GetProperty("Instance", BindingFlags.Static | BindingFlags.Public | BindingFlags.FlattenHierarchy);
+                    _optHide = tOpt.GetProperty("HideUnidentifiedIn3D", all);
+                    _gEnemyCtl = Acc(tGlobals, "AllowControlOfEnemyUnits");
+                }
+                catch (Exception e) { Trace("HideUnseen cheat switches: " + e.Message); }
                 var tSensor = asm.GetType("SeaPower.SensorSystem"); var tVisual = asm.GetType("SeaPower.SensorSystemVisual");
                 _sHost = Acc(tVisual, "Host") ?? Acc(tVisual, "_baseObject");
                 _sDetected = Acc(tSensor, "_detectedObjects");
@@ -149,9 +158,31 @@ namespace AlternativeSpecialEffects
             catch (Exception e) { Trace("HideUnseen: " + e.Message); }
         }
 
+        /// <summary>
+        /// The cheat switches of the F10 menu win over this option: "Show Unidentified" (the game's own HideUnidentifiedIn3D is off) or "Control Enemy Units".
+        /// Every contact is then drawn; it is judged again at its next update, so nothing is polled.
+        /// </summary>
+        static bool Cheating()
+        {
+            try
+            {
+                var om = _optInstance == null ? null : _optInstance.GetValue(null, null);
+                if (om != null && _optHide != null && !(bool)_optHide.GetValue(om, null)) return true;
+                var rp = _gEnemyCtl == null ? null : _gEnemyCtl(null);
+                if (rp != null)
+                {
+                    if (_rpValue == null) _rpValue = rp.GetType().GetProperty("Value");
+                    if (_rpValue != null && (bool)_rpValue.GetValue(rp, null)) return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
         /// <summary>Drawn: seen by a visual sensor, or a submarine while submarines are not hidden.</summary>
         static bool Visible(Component obj)
         {
+            if (Cheating()) return true;
             if (Seen(obj)) return true;
             return !HideSubs() && IsSubmarine(obj);
         }

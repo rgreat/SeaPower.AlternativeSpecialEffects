@@ -1,0 +1,6 @@
+; Forces a ship into a funnel smoke group (the settings of the groups are on the Funnel Smoke tab).
+; Without a line here a ship's group is the type of its power system in use: Diesel, Steam, GasTurbine or Nuclear
+; (Electric, AIP and None count as Nuclear = no smoke).
+; Format:  ini_name = Group        Groups: Diesel, Steam, GasTurbine, Nuclear, Combined
+; The ini name is the vessel's file name without .ini (vessels/wp_rkr_kirov.ini -> wp_rkr_kirov).
+wp_rkr_kirov = Combined

@@ -1,0 +1,9 @@
+1.2.0
+- Burning ships: the smoke above them lasts longer, spreads and fades smoothly.
+- Smoke and clouds no longer overlap incorrectly.
+- Fixed a sudden smoke colour jump near the horizon.
+- Funnel smoke remade: new Lightness, Duration and Thickness settings for each engine type.
+- Bigger engines make bigger smoke. Settings can be set per engine type, per ship and per country.
+- Tuned default values.
+- "Hide targets not seen in 3D" no longer affects the F10 cheat modes.
+- Binocular option moved to the Alternative Game Interface mod.
