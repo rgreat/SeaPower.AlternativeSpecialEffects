@@ -45,6 +45,7 @@ namespace AlternativeSpecialEffects
             var em = asm.GetType("SeaPower.EffectsManager");
             var se = em == null ? null : em.GetMethod("spawnEffect", inst);
             if (se != null) harmony.Patch(se, postfix: Hm("HitEffect"));
+            PlayWorld = em == null ? null : em.GetMethod("PlayWorldSound", inst);
             var wbT = asm.GetType("SeaPower.WeaponBase");
             var cde = wbT == null ? null : wbT.GetMethod("CreateDesctructionEffects", inst | BindingFlags.DeclaredOnly);
             if (cde != null) harmony.Patch(cde, prefix: Hm("DetonationEnter"), postfix: Hm("DetonationFlash"), finalizer: Hm("DetonationLeave"));
@@ -121,7 +122,8 @@ namespace AlternativeSpecialEffects
         {
             var a = Active;
             if (a == null || !Enabled || a._mgSoundLoop == null || !a._mgSoundLoop.Value) return;
-            var snd = R.F(ciws, "_sound");
+            var ds = R.F(ciws, "_distanceSound");   // 0.9.0+: the burst is played by an emitter of the distance-sound system
+            var snd = ds != null ? R.F(ds, "Near") : R.F(ciws, "_sound");
             if (snd == null || !R.B(R.P(snd, "isPlaying"))) return;
             var clip = R.P(snd, "clip");
             if (clip == null) return;
@@ -163,16 +165,34 @@ namespace AlternativeSpecialEffects
                     R.SetP(n, "rolloffMode", R.P(d, "rolloffMode"));
                     R.SetP(n, "minDistance", R.P(d, "minDistance"));
                     R.SetP(n, "outputAudioMixerGroup", R.P(d, "outputAudioMixerGroup"));
+                    _added.Add(n);
                     srcs = new Component[] { n };
                 }
+                var em = PlayWorld == null ? null : WorldSoundOwner();
                 foreach (var a in srcs)
                 {
                     if (R.P(a, "clip") == null) continue;
+                    if (em != null)
+                    {
+                        // 0.9.0+: the game plays its own sources itself (delay by distance, far clip); only ours go through PlayWorldSound
+                        if (!_added.Contains(a) || !R.B(R.P(a, "enabled"))) continue;
+                        R.SetP(a, "maxDistance", Math.Max(HitSoundMinRange, R.Fl(R.P(a, "maxDistance"))));
+                        PlayWorld.Invoke(em, new object[] { a });
+                        continue;
+                    }
                     if (R.Fl(R.P(a, "maxDistance")) < HitSoundMinRange) R.SetP(a, "maxDistance", HitSoundMinRange);
                     if (R.B(R.P(a, "enabled")) && !R.B(R.P(a, "isPlaying"))) R.Call(a, "Play");
                 }
             }
             catch (Exception e) { Trace("hit sound: " + e.Message); }
+        }
+
+        static readonly HashSet<object> _added = new HashSet<object>();   // AudioSources this mod put on hit effects (pooled effects keep them)
+        static System.Reflection.MethodInfo PlayWorld;                    // EffectsManager.PlayWorldSound(AudioSource), 0.9.0+
+        static UnityEngine.Object WorldSoundOwner()
+        {
+            if (_donorsOwner == null) _donorsOwner = UnityEngine.Object.FindObjectOfType(PlayWorld.DeclaringType);
+            return _donorsOwner;
         }
 
         static void FindDonors()
