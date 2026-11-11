@@ -91,6 +91,13 @@ namespace AlternativeSpecialEffects
             Add(T4, "grp.tracers", "Guns/MachineGunBurstFix", "Machine gun tracers in the whole burst", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T4, "grp.tracers", "Guns/MachineGunSoundLoopFix", "Seamless machine gun sound", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T4, "grp.tracers", "Guns/HitSoundFix", "Always play gun hit sound", "", Kind.Bool, 0, 0, 0, "game: off");
+            for (int c = 1; c <= HitEffects.Tiers; c++)
+            {
+                string g = "grp.hitC" + c;
+                SubGroups.Add(g);
+                if (c < HitEffects.Tiers) Add(T4, g, "GunHits/Class" + c + "UpToKg", "Shells up to mass", "kg", Kind.Number, 0.1f, 0.05f, 5000f);
+                foreach (var sl in HitEffects.Slots) Add(T4, g, "GunHits/Class" + c + sl, "Size", "x", Kind.Number, 0.1f, 0.05f, 10f);
+            }
             Add(T6, "grp.funnel", "FunnelSmoke/Enabled", "Funnel smoke by engine type", "", Kind.Bool, 0, 0, 0, "game: off");
             Add(T6, "grp.funnel", "FunnelSmoke/PowerExponent", "Smoke by engine power", "", Kind.Number, 0.1f, 0f, 2f);
             Add(T6, "grp.funnel", "FunnelSmoke/SizeByPower", "Particle size by power", "", Kind.Number, 0.1f, 0f, 2f);
@@ -522,7 +529,11 @@ namespace AlternativeSpecialEffects
             }
             string group = null; bool subBar = false; _subBar = null; _pageBar = null;
             if (_curTab == FunnelTab) _body.Children.Add(PageTabs());
-            if (_curSub == null || !SubGroups.Contains(_curSub)) _curSub = SubGroups.Count > 0 ? SubGroups[0] : null;
+            if (_curSub == null || !SubGroups.Contains(_curSub) || !HasFields(_curTab, _curSub))
+            {
+                _curSub = null;
+                foreach (var g in SubGroups) if (HasFields(_curTab, g)) { _curSub = g; break; }
+            }
             foreach (var f in Fields)
             {
                 if (f.Tab != _curTab) continue;
@@ -580,6 +591,12 @@ namespace AlternativeSpecialEffects
                 _subBar.Children.Add(b);
             }
             return _subBar;
+        }
+
+        static bool HasFields(string tab, string group)
+        {
+            foreach (var f in Fields) if (f.Tab == tab && f.Group == group) return true;
+            return false;
         }
 
         static bool GroupChanged(string group)

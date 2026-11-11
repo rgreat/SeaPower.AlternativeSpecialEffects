@@ -15,6 +15,10 @@ Funnel smoke
 - Ships and Countries pages: pick any ship or country from the list and set its own multipliers (0 to 10) for particles, duration, lightness and thickness. They are multiplied with the engine type values.
 - Better default values for engine types, global thickness, size by power and some ships and countries.
 
+Gun hit effects
+- Every gun shell now gets hit effects by its size: 10 classes by shell mass, also for shells of other mods. Each class has its own effects and size for a hit on a ship, a burst in the air, a splash on the water and a hit on the ground.
+- The sizes and the mass limits of the classes are set in the Guns tab. The hit effects no longer need changes in the weapon files of the cumulative pack.
+
 Other
 - "Hide targets not seen in 3D" is not applied while the F10 cheat modes (show unidentified, control enemy units) are on.
 - The binocular normal view option moved to Alternative Game Interface.

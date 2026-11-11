@@ -46,6 +46,8 @@ namespace AlternativeSpecialEffects
                                    _mgBurstFix, _mgSoundLoop, _hitSoundFix, _smoke, _density, _smokeSort, _smokeCloud, _smokeKeep, _hide3d, _hideSubs, _gunHits, _raftLights;
         internal ConfigEntry<bool> _funnelOn; internal ConfigEntry<float> _funnelGlobal, _funnelGlobalThick, _funnelPowExp, _funnelPowRef, _funnelSizeExp;
         ConfigEntry<string> _funnelShips, _funnelNations;
+        readonly ConfigEntry<float>[] _hitUp = new ConfigEntry<float>[HitEffects.Tiers - 1];
+        readonly ConfigEntry<float>[,] _hitScale = new ConfigEntry<float>[HitEffects.Tiers, HitEffects.Slots.Length];
         internal readonly Dictionary<string, ConfigEntry<float>[]> _funnel = new Dictionary<string, ConfigEntry<float>[]>();
         internal ConfigEntry<float> _flashPower, _firePower, _dayBright, _densityMin, _densityEnd, _smokeMod, _smokeSev, _smokeLife, _smokeShare, _smokeGrow, _smokeFade, _smokeDens, _bubbles;
         public static string UserDir { get; private set; }
@@ -161,8 +163,15 @@ namespace AlternativeSpecialEffects
             }
             _smokeSev = Cfg.Bind("Effects", "SmokeSevereFrom", 90f, "The severe fire's look from this strength, % of the fire's maximum (the game: 50%).");
             _gunHits = Cfg.Bind("Effects", "GunHitEffects", true,
-                "More visible and spectacular hits of gun shells (calibres from 37 mm up): the hit effects of 47 gun ammunition files are replaced (hit_effects.txt of the mod, from the rgreat cumulative pack). " +
-                "Off = the game's own hit effects. Takes effect at once; a shell already in the air keeps the effect it had.");
+                "More visible and spectacular hits of gun shells: by its mass every gun shell gets one of 10 classes, each with its own collection of the hit effects on a ship, in the air, on the water and on the ground, and a scale of each. " +
+                "Off = the game's own hit effects. Takes effect at once; a shell already in the air keeps the effect it had. The classes are set in the Guns tab.");
+            for (int t = 0; t < HitEffects.Tiers; t++)
+            {
+                if (t < HitEffects.Tiers - 1)
+                    _hitUp[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "UpToKg", HitEffects.DefaultUp(t), "Class " + (t + 1) + " of the gun hit effects: shells up to this mass, kg (the next class is above). The mass is the ini key General/Mass.");
+                for (int sl = 0; sl < HitEffects.Slots.Length; sl++)
+                    _hitScale[t, sl] = Cfg.Bind("GunHits", "Class" + (t + 1) + HitEffects.Slots[sl], HitEffects.DefaultScale(t, sl), "Class " + (t + 1) + " of the gun hit effects: the size (scale) of the effect " + new[] { "on a ship", "in the air", "on the water", "on the ground" }[sl] + ", x of the effect's own size.");
+            }
             _raftLights = Cfg.Bind("Effects", "LifeRaftLights", true,
                 "A blinking red light on life rafts (visible at night). Off = rafts without lights. Takes effect at once.");
             _bubbles = Cfg.Bind("Effects", "BubblesStopMinutes", 10f,
@@ -192,6 +201,8 @@ namespace AlternativeSpecialEffects
 
             Loc.Trace = Trace; Loc.Forced = () => _language == null ? "" : _language.Value;
             Entries.Add(_funnelOn); Entries.Add(_funnelGlobal); Entries.Add(_funnelGlobalThick); Entries.Add(_funnelPowExp); Entries.Add(_funnelPowRef); Entries.Add(_funnelSizeExp); Entries.Add(_funnelShips); Entries.Add(_funnelNations);
+            foreach (var e in _hitUp) if (e != null) Entries.Add(e);
+            foreach (var e in _hitScale) Entries.Add(e);
             foreach (var kv in _funnel) foreach (var e in kv.Value) Entries.Add(e);
             foreach (var en in Entries) Loc.Register("help." + en.Definition.Section + "/" + en.Definition.Key, en.Description == null ? "" : en.Description.Description);
 
@@ -226,6 +237,7 @@ namespace AlternativeSpecialEffects
         void WireModules()
         {
             HitEffects.Trace = Trace; HitEffects.Want = () => Enabled && _gunHits.Value;
+            HitEffects.UpToKg = t => _hitUp[t].Value; HitEffects.Scale = (t, sl) => _hitScale[t, sl].Value;
             RaftLights.Trace = Trace; RaftLights.Want = () => Enabled && _raftLights.Value;
             FireSmoke.Trace = Trace; FireSmoke.Verbose = () => _debug;
             FireSmoke.IsEnabled = () => Enabled && _smoke.Value;

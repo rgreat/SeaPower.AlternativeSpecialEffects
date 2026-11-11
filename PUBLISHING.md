@@ -7,7 +7,6 @@ nuget.config                       empty NuGet source list (offline build)
 src/                               plugin sources (see DEVNOTES.md)
 Release/                           THE MOD: upload the contents of this folder
   _info.ini  AlternativeSpecialEffects.dll  thumbnail.jpg  lang/*.ini
-  hit_effects.txt                       gun hit effects (read by the mod itself, not a game ini)
   vessels.fix/  vessels/                life raft lights (#!extend patches), see DEVNOTES.md
 ```
 In StreamingAssets the mod folder must be named `AlternativeSpecialEffects`: the game keeps the mod's tick in `usersettings.ini` by the folder name and the mod reads it.

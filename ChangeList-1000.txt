@@ -4,6 +4,7 @@
 - Fixed a sudden smoke colour jump near the horizon.
 - Funnel smoke remade: new Lightness, Duration and Thickness settings for each engine type.
 - Bigger engines make bigger smoke. Settings can be set per engine type, per ship and per country.
+- Gun hit effects by shell size: 10 classes (any gun, also from other mods), set in the Guns tab.
 - Tuned default values.
 - "Hide targets not seen in 3D" no longer affects the F10 cheat modes.
 - Binocular option moved to the Alternative Game Interface mod.

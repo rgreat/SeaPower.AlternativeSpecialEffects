@@ -139,6 +139,15 @@ namespace AlternativeSpecialEffects
             D("lbl.UI/HideUnobservedTargets3D", "Hide targets that are not seen in 3D");
             D("lbl.UI/HideUnobservedSubmarines3D", "Hide submarines too");
             D("lbl.Effects/GunHitEffects", "Spectacular gun hit effects");
+            for (int c = 1; c <= 10; c++)
+            {
+                D("grp.hitC" + c, "Class " + c);
+                D("lbl.GunHits/Class" + c + "UpToKg", "Shells up to mass");
+                D("lbl.GunHits/Class" + c + "Ship", "Hit on a ship: size");
+                D("lbl.GunHits/Class" + c + "Air", "Burst in the air: size");
+                D("lbl.GunHits/Class" + c + "Water", "Splash on the water: size");
+                D("lbl.GunHits/Class" + c + "Ground", "Hit on the ground: size");
+            }
             D("lbl.Effects/LifeRaftLights", "Life raft lights");
             D("unit.x", "x");
         }

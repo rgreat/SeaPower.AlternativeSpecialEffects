@@ -23,7 +23,7 @@ Special effects of the 3D picture in one mod with its own settings window: light
 
 [h3]Guns[/h3]
 [olist]
-[*][b]More visible gun hit effects[/b] for calibres from 37 mm up. Applied and removed at once, no restart.
+[*][b]More visible gun hit effects[/b] by shell size: 10 classes, each with its own effects and sizes. Applied and removed at once, no restart.
 [*][b]Machine guns:[/b] tracers and the muzzle burst sound last for the whole burst. Gun hit sound fix.
 [/olist]
 
