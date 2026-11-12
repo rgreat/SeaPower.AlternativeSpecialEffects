@@ -116,7 +116,7 @@ namespace AlternativeSpecialEffects
             D("lbl.FunnelSmoke/GasTurbineThicknessFull", "Smoke thickness at full power"); D("unit.FunnelSmoke/GasTurbineThicknessFull", "x");
             D("lbl.FunnelSmoke/GasTurbineLifeIdle", "Smoke duration at idle"); D("unit.FunnelSmoke/GasTurbineLifeIdle", "x");
             D("lbl.FunnelSmoke/GasTurbineLifeFull", "Smoke duration at full power"); D("unit.FunnelSmoke/GasTurbineLifeFull", "x");
-            D("grp.funnelNuclear", "Nuclear (no smoke)");
+            D("grp.funnelNuclear", "Nuclear");
             D("lbl.FunnelSmoke/NuclearDensityIdle", "Density at idle"); D("unit.FunnelSmoke/NuclearDensityIdle", "x");
             D("lbl.FunnelSmoke/NuclearDensityFull", "Density at full power"); D("unit.FunnelSmoke/NuclearDensityFull", "x");
             D("lbl.FunnelSmoke/NuclearLightIdle", "Smoke lightness at idle"); D("unit.FunnelSmoke/NuclearLightIdle", "% · 0 black, 100 white");

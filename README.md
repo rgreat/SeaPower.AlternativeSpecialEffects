@@ -33,6 +33,6 @@ Alternative Weapons Control and Alternative Damage Model settings.
 
 Subscribe in the Steam Workshop (needs Anchor Chain) or copy the contents of `Release` to
 `Sea Power_Data/StreamingAssets/AlternativeSpecialEffects/` and tick the mod in the Mods menu.
-Supports Sea Power version 0.8.7 (Release and Stable Beta).
+Supports Sea Power version 0.9.0 and newer.
 
 Source: https://github.com/rgreat/SeaPower.AlternativeSpecialEffects

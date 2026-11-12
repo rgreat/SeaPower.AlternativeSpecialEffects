@@ -20,7 +20,7 @@ dotnet build -c Release -p:ManagedDir=<Sea Power_Data>/Managed -p:BepInExCore=<B
 
 ## Check in the game
 1. Copy `Release` to `StreamingAssets/AlternativeSpecialEffects/`, tick the mod, Apply, restart the game.
-2. `BepInEx/LogOutput.log`: `Alternative Special Effects 1.2.0 ... loaded`, `Enabled in the game's Mods menu`, no `not found` warnings.
+2. `BepInEx/LogOutput.log`: `Alternative Special Effects 1.3.0 ... loaded`, `Enabled in the game's Mods menu`, no `not found` warnings.
 3. A **Special Effects** button is in the main menu and in the pause menu of a mission; it opens the settings window.
 4. Sink a ship, save, load: with BubblesStopMinutes > 0 the bubbles of a ship that sank before the save still stop (new ones are not made by the load).
 5. Untick the mod and enter a mission: `Disabled in the game's Mods menu`, nothing changed.

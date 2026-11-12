@@ -1,10 +1,6 @@
-1.2.0
-- Burning ships: the smoke above them lasts longer, spreads and fades smoothly.
-- Smoke and clouds no longer overlap incorrectly.
-- Fixed a sudden smoke colour jump near the horizon.
-- Funnel smoke remade: new Lightness, Duration and Thickness settings for each engine type.
-- Bigger engines make bigger smoke. Settings can be set per engine type, per ship and per country.
-- Gun hit effects by shell size: 10 classes (any gun, also from other mods), set in the Guns tab.
-- Tuned default values.
-- "Hide targets not seen in 3D" no longer affects the F10 cheat modes.
-- Binocular option moved to the Alternative Game Interface mod.
+1.3.0
+- Needs Sea Power 0.9.0 or newer.
+- CIWS and gun hit sound fixes work with the game's new sound system.
+- Gun hit effects by shell size: 10 classes (any gun, also from other mods), each with its own effects and sizes. Set in the Guns tab.
+- Funnel smoke group "Nuclear (no smoke)" renamed to "Nuclear".
+- "Alternative Mods" menu button works under R.A.T.S. Keel.

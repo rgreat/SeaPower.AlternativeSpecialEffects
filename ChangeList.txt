@@ -1,24 +1,13 @@
-1.2.0
+1.3.0
 
-Fire and smoke
-- Burning ships: the flames now look exactly like in the game. Only the smoke above them lasts longer, and it now spreads out and fades gradually, so the long column no longer falls apart (SmokeSpreadGrowth, SmokeSpreadFade).
-- Smoke and clouds are drawn in the right order: clouds in front no longer hide smoke behind them wrongly, and smoke in front is no longer covered by clouds (SmokeAfterClouds).
-- Smoke no longer changes colour suddenly near the horizon (ColourGradingNoDepthMask).
-
-Funnel smoke
-- New Lightness setting replaces Brightness: from black through grey to white. Before, more brightness only turned smoke from black to orange.
-- Each engine type now has its own Duration (how long smoke lives; shorter life does not make it spread faster) and Thickness (how dense it looks) for slow and full speed.
-- Changing the engine mode now affects only the new smoke. Smoke already in the air keeps its colour.
-- Nuclear + oil ships (Combined) smoke only when going faster than full ahead, and more the closer they get to top speed.
-- Bigger engines make bigger smoke from the very start, but it grows less later than the smoke of small ships.
-- Funnel Smoke tab now has pages: General, Engine types, Ships and Countries.
-- Ships and Countries pages: pick any ship or country from the list and set its own multipliers (0 to 10) for particles, duration, lightness and thickness. They are multiplied with the engine type values.
-- Better default values for engine types, global thickness, size by power and some ships and countries.
+Sea Power 0.9.0
+- The mod now needs Sea Power 0.9.0 or newer.
+- The CIWS burst sound fix and the gun hit sound fix work with the game's new sound system (sounds delayed by distance).
 
 Gun hit effects
 - Every gun shell now gets hit effects by its size: 10 classes by shell mass, also for shells of other mods. Each class has its own effects and size for a hit on a ship, a burst in the air, a splash on the water and a hit on the ground.
-- The sizes and the mass limits of the classes are set in the Guns tab. The hit effects no longer need changes in the weapon files of the cumulative pack.
+- The sizes and the mass limits of the classes are set in the Guns tab.
 
 Other
-- "Hide targets not seen in 3D" is not applied while the F10 cheat modes (show unidentified, control enemy units) are on.
-- The binocular normal view option moved to Alternative Game Interface.
+- The "Alternative Mods" menu button also appears when the mod is started by R.A.T.S. Keel (after the start-up load screen is over).
+- The funnel smoke group "Nuclear (no smoke)" is now just "Nuclear".

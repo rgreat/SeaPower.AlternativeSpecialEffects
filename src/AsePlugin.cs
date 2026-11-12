@@ -24,7 +24,7 @@ namespace AlternativeSpecialEffects
     {
         public const string PluginGuid = "com.rgreat.seapower.alternativespecialeffects";
         public const string PluginName = "Alternative Special Effects";
-        public const string PluginVersion = "1.2.0";
+        public const string PluginVersion = "1.3.0";
 
         public static readonly string BuildId = ReadBuildId();
 

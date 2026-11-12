@@ -13,7 +13,7 @@ dotnet build -c Release -p:ManagedDir=/home/claude/seapower.gamefiles/Managed -p
 
 ## User preferences
 Replies in Russian, short; no routine boilerplate, no "not tested" disclaimers; no commit/push/release without an explicit command; project source files change only
-on the user's command; mod docs in English; one .cfg switch per feature; events/hooks instead of polling; warn before anything that breaks 0.8.6/0.8.7;
+on the user's command; mod docs in English; one .cfg switch per feature; events/hooks instead of polling; the mod supports Sea Power 0.9.0 and newer only (no compatibility with older versions);
 sizes in screen pixels; labels must fit their columns; the mod zip keeps the structure (Release/, src/, csproj, docs at the root).
 
 ## Origin of the options (names and sections are the same as in the old mods - the migration matches by [Section] Key)
@@ -91,10 +91,13 @@ The extend rules of the game, for reference (IniHandler): extend files of a targ
 - Smoke order (`SmokeSortFix`): columns are ranked by the exact distance from the camera to their emitter points (no rounding; equal ones by creation order), rank i - N/2 goes into `sortingOrder` (nearer = higher), set in Camera.onPreCull / beginCameraRendering. History: a sortingFudge compensation by the bounds' centre flickered (noisy bounds); a tie window made the order follow the creation order (bow to stern).
 
 ## Sea Power 0.9.0 (distance-sound system)
-- `_info.ini`: `GreaterThanEqualToVersion=0.8.6` (`ApproximateVersion` rejects a newer minor version).
+- `_info.ini`: `GreaterThanEqualToVersion=0.9.0` (`ApproximateVersion` rejects a newer minor version). Game versions before 0.9.0 are not supported: the fallbacks for them are removed.
 - MachineGunSoundLoopFix: CIWS no longer plays `_sound` (it is disabled); the burst goes through `PlaySoundDistanceBased`, so the loop
-  region is applied to `CIWS._distanceSound.Near` (falls back to `_sound` before 0.9.0).
+  region is applied to `CIWS._distanceSound.Near`.
 - HitSoundFix: 0.9.0 plays the sources of the effect prefabs itself (`PlayEffectAudio`). Only the AudioSource added by the mod goes through
   `EffectsManager.PlayWorldSound` (delay by distance, far clip); `_added` remembers them because pooled effects keep the component.
   The 50-unit minimum range is applied to our source only (the game's sources are already playing when the postfix runs).
 - Not verified in the game, only against the decompile.
+
+## Settings hub under R.A.T.S. Keel
+- Keel starts the mods after `LoadScreen.ExecuteLoadScreen` is over, so the `LoadScreenPostfix` never fires. `SettingsHub.Install` first checks `LoadScreenIsDone` (`Singleton<LoadScreen>.InstanceExists` -> `Instance` -> `LoadText == "Done"`) and, if so, installs the menu entries at once and gives the already built main menu its button. Under Anchor Chain the old path (wait for the end of the coroutine) is unchanged. The canonical copy of `SettingsHub.cs` is here; ADM, AWC and AGI take it unchanged.

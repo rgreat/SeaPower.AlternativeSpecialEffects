@@ -1,4 +1,4 @@
-Version 1.2.0.
+Version 1.3.0.
 
 Special effects of the 3D picture in one mod with its own settings window: lights, fires, smoke and guns. Takes over the effects that were spread over Alternative Weapons Control, Alternative Damage Model and the rgreat Cumulative Pack.
 
@@ -42,7 +42,7 @@ Special effects of the 3D picture in one mod with its own settings window: light
 
 [h1]Compatibility[/h1]
 [list]
-[*]Supports Sea Power version 0.8.7 (Release and Stable Beta).
+[*]Supports Sea Power version 0.9.0 and newer.
 [*]Requires Anchor Chain.
 [*]Can be switched on/off in the game's Mods menu.
 [*]If you use Alternative Weapons Control, Alternative Damage Model or the rgreat Cumulative Pack, use their latest versions: the moved options are removed from them.
