@@ -6,7 +6,8 @@ Sea Power 0.9.0
 
 Gun hit effects
 - Every gun shell now gets hit effects by its size: 10 classes by shell mass, also for shells of other mods. Each class has its own effects and size for a hit on a ship, a burst in the air, a splash on the water and a hit on the ground.
-- The sizes and the mass limits of the classes are set in the Guns tab.
+- The sizes and the mass limits of the classes are set in the Guns tab. The size applies to the whole effect, also to the spray and mist around a water column.
+- Shells in flight get a shape (tiny, small, medium, large) and a colour by the same classes, so big guns look different from small ones. Both can be set per class, or left as in the game. Takes effect when a mission is loaded.
 
 Other
 - The "Alternative Mods" menu button also appears when the mod is started by R.A.T.S. Keel (after the start-up load screen is over).

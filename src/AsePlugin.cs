@@ -47,6 +47,8 @@ namespace AlternativeSpecialEffects
         internal ConfigEntry<bool> _funnelOn; internal ConfigEntry<float> _funnelGlobal, _funnelGlobalThick, _funnelPowExp, _funnelPowRef, _funnelSizeExp;
         ConfigEntry<string> _funnelShips, _funnelNations;
         readonly ConfigEntry<float>[] _hitUp = new ConfigEntry<float>[HitEffects.Tiers - 1];
+        readonly ConfigEntry<float>[] _hitSize = new ConfigEntry<float>[HitEffects.Tiers];
+        readonly ConfigEntry<string>[] _hitModel = new ConfigEntry<string>[HitEffects.Tiers], _hitColor = new ConfigEntry<string>[HitEffects.Tiers];
         readonly ConfigEntry<float>[,] _hitScale = new ConfigEntry<float>[HitEffects.Tiers, HitEffects.Slots.Length];
         internal readonly Dictionary<string, ConfigEntry<float>[]> _funnel = new Dictionary<string, ConfigEntry<float>[]>();
         internal ConfigEntry<float> _flashPower, _firePower, _dayBright, _densityMin, _densityEnd, _smokeMod, _smokeSev, _smokeLife, _smokeShare, _smokeGrow, _smokeFade, _smokeDens, _bubbles;
@@ -169,6 +171,9 @@ namespace AlternativeSpecialEffects
             {
                 if (t < HitEffects.Tiers - 1)
                     _hitUp[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "UpToKg", HitEffects.DefaultUp(t), "Class " + (t + 1) + " of the gun hit effects: shells up to this mass, kg (the next class is above). The mass is the ini key General/Mass.");
+                _hitSize[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "ShellSize", 1f, "Class " + (t + 1) + " of the gun hit effects: the size (length) of the shell in flight, x of the size of the ammunition's own model. Takes effect on the next shot.");
+                _hitModel[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "ShellModel", HitEffects.DefaultModel(t), "Class " + (t + 1) + " of the gun hit effects: the shape of the shell in flight: game (the ammunition's own), tiny, small, medium, large. Takes effect on the next shot.");
+                _hitColor[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "ShellColor", HitEffects.DefaultColor(t), "Class " + (t + 1) + " of the gun hit effects: the colour of the shell in flight: game (the ammunition's own), red, darkred, yellow, green, white. Takes effect on the next shot.");
                 for (int sl = 0; sl < HitEffects.Slots.Length; sl++)
                     _hitScale[t, sl] = Cfg.Bind("GunHits", "Class" + (t + 1) + HitEffects.Slots[sl], HitEffects.DefaultScale(t, sl), "Class " + (t + 1) + " of the gun hit effects: the size (scale) of the effect " + new[] { "on a ship", "in the air", "on the water", "on the ground" }[sl] + ", x of the effect's own size.");
             }
@@ -203,6 +208,9 @@ namespace AlternativeSpecialEffects
             Entries.Add(_funnelOn); Entries.Add(_funnelGlobal); Entries.Add(_funnelGlobalThick); Entries.Add(_funnelPowExp); Entries.Add(_funnelPowRef); Entries.Add(_funnelSizeExp); Entries.Add(_funnelShips); Entries.Add(_funnelNations);
             foreach (var e in _hitUp) if (e != null) Entries.Add(e);
             foreach (var e in _hitScale) Entries.Add(e);
+            foreach (var e in _hitModel) Entries.Add(e);
+            foreach (var e in _hitSize) Entries.Add(e);
+            foreach (var e in _hitColor) Entries.Add(e);
             foreach (var kv in _funnel) foreach (var e in kv.Value) Entries.Add(e);
             foreach (var en in Entries) Loc.Register("help." + en.Definition.Section + "/" + en.Definition.Key, en.Description == null ? "" : en.Description.Description);
 
@@ -238,6 +246,7 @@ namespace AlternativeSpecialEffects
         {
             HitEffects.Trace = Trace; HitEffects.Want = () => Enabled && _gunHits.Value;
             HitEffects.UpToKg = t => _hitUp[t].Value; HitEffects.Scale = (t, sl) => _hitScale[t, sl].Value;
+            HitEffects.ShellSize = t => _hitSize[t].Value; HitEffects.ShellModel = t => _hitModel[t].Value; HitEffects.ShellColor = t => _hitColor[t].Value;
             RaftLights.Trace = Trace; RaftLights.Want = () => Enabled && _raftLights.Value;
             FireSmoke.Trace = Trace; FireSmoke.Verbose = () => _debug;
             FireSmoke.IsEnabled = () => Enabled && _smoke.Value;

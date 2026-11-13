@@ -143,11 +143,20 @@ namespace AlternativeSpecialEffects
             {
                 D("grp.hitC" + c, "Class " + c);
                 D("lbl.GunHits/Class" + c + "UpToKg", "Shells up to mass");
+                D("lbl.GunHits/Class" + c + "ShellModel", "Shell shape");
+                D("lbl.GunHits/Class" + c + "ShellColor", "Shell colour");
+                D("lbl.GunHits/Class" + c + "ShellSize", "Shell size");
                 D("lbl.GunHits/Class" + c + "Ship", "Hit on a ship: size");
                 D("lbl.GunHits/Class" + c + "Air", "Burst in the air: size");
                 D("lbl.GunHits/Class" + c + "Water", "Splash on the water: size");
                 D("lbl.GunHits/Class" + c + "Ground", "Hit on the ground: size");
             }
+            D("opt.game", "As in the game"); D("opt.tiny", "Tiny"); D("opt.small", "Small"); D("opt.medium", "Medium"); D("opt.large", "Large");
+            D("opt.red", "Red"); D("opt.darkred", "Dark red"); D("opt.yellow", "Yellow"); D("opt.green", "Green"); D("opt.white", "White");
+            D("hdr.hitClasses", "Hit effect classes (by shell mass)");
+            D("desc.hitCalUp", "Class {0} - the calibre of its guns (estimated from the mass): up to about {1} mm");
+            D("desc.hitCalRange", "Class {0} - the calibre of its guns (estimated from the mass): about {1} mm");
+            D("desc.hitCalFrom", "Class {0} - the calibre of its guns (estimated from the mass): from about {1} mm");
             D("lbl.Effects/LifeRaftLights", "Life raft lights");
             D("unit.x", "x");
         }

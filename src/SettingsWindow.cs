@@ -22,7 +22,7 @@ namespace AlternativeSpecialEffects
         public static Action<string> Trace = s => { };
         public static Action<string> Warn = s => { };
 
-        enum Kind { Number, Bool, Lang, Ships }
+        enum Kind { Number, Bool, Lang, Ships, Choice }
 
         sealed class Field
         {
@@ -96,6 +96,9 @@ namespace AlternativeSpecialEffects
                 string g = "grp.hitC" + c;
                 SubGroups.Add(g);
                 if (c < HitEffects.Tiers) Add(T4, g, "GunHits/Class" + c + "UpToKg", "Shells up to mass", "kg", Kind.Number, 0.1f, 0.05f, 5000f);
+                Add(T4, g, "GunHits/Class" + c + "ShellModel", "Shell shape", string.Join(",", HitEffects.Models), Kind.Choice, 0, 0, 0);
+                Add(T4, g, "GunHits/Class" + c + "ShellSize", "Shell size", "x", Kind.Number, 0.1f, 0.1f, 10f);
+                Add(T4, g, "GunHits/Class" + c + "ShellColor", "Shell colour", string.Join(",", HitEffects.Colors), Kind.Choice, 0, 0, 0);
                 foreach (var sl in HitEffects.Slots) Add(T4, g, "GunHits/Class" + c + sl, "Size", "x", Kind.Number, 0.1f, 0.05f, 10f);
             }
             Add(T6, "grp.funnel", "FunnelSmoke/Enabled", "Funnel smoke by engine type", "", Kind.Bool, 0, 0, 0, "game: off");
@@ -540,10 +543,26 @@ namespace AlternativeSpecialEffects
                 if (_curTab == FunnelTab && PageOf(f.Group) != _curPage) continue;
                 if (SubGroups.Contains(f.Group))
                 {
-                    if (!subBar) { subBar = true; _body.Children.Add(SubTabs(_curTab)); }
+                    if (!subBar)
+                    {
+                        subBar = true;
+                        if (f.Group.StartsWith("grp.hitC")) _body.Children.Add(GroupTitle(Loc.T("hdr.hitClasses")));
+                        _body.Children.Add(SubTabs(_curTab));
+                    }
                     if (f.Group != _curSub) continue;
                 }
-                if (f.Group != group) { group = f.Group; _body.Children.Add(GroupTitle(Loc.T(group))); }
+                if (f.Group != group)
+                {
+                    group = f.Group;
+                    if (group.StartsWith("grp.hitC"))
+                    {
+                        int hc = int.Parse(group.Substring(8)); var d = Text(HitCalText(hc), CDim, 12f);
+                        _hitDesc = () => d.Text = HitCalText(hc);
+                        d.TextWrapping = TextWrapping.Wrap; d.Margin = new Thickness(12f, 4f, 12f, 4f);
+                        _body.Children.Add(d);
+                    }
+                    else _body.Children.Add(GroupTitle(Loc.T(group)));
+                }
                 if (f.Kind == Kind.Ships) ShipRows(f); else _body.Children.Add(Row(f));
             }
             UpdateStatus();
@@ -646,8 +665,29 @@ namespace AlternativeSpecialEffects
             return false;
         }
 
+        static Action _hitDesc;
+
+        /// <summary>The calibre of a hit-effect class from the mass limits set now: a shell weighs about 48 kg at 152 mm and the mass goes with the cube of the calibre.</summary>
+        static string HitCalText(int c)
+        {
+            Func<int, double> lim = n =>
+            {
+                string v; double d;
+                return n >= 1 && n <= HitEffects.Tiers - 1 && _work.TryGetValue("GunHits/Class" + n + "UpToKg", out v) && double.TryParse(v, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out d) ? d : 0.0;
+            };
+            Func<double, string> cal = kg =>
+            {
+                double d = 152.0 * Math.Pow(Math.Max(kg, 0.001) / 48.0, 1.0 / 3.0);
+                return (d < 60.0 ? Math.Round(d) : Math.Round(d / 5.0) * 5.0).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+            };
+            if (c <= 1) return string.Format(Loc.T("desc.hitCalUp"), c, cal(lim(1)));
+            if (c >= HitEffects.Tiers) return string.Format(Loc.T("desc.hitCalFrom"), c, cal(lim(c - 1)));
+            return string.Format(Loc.T("desc.hitCalRange"), c, cal(lim(c - 1)) + "-" + cal(lim(c)));
+        }
+
         static void UpdateStatus()
         {
+            if (_hitDesc != null) _hitDesc();
             if (_status == null) return;
             bool any = false;
             foreach (var f in Fields) if (!Same(Get(f), Saved(f))) { any = true; break; }
@@ -676,12 +716,13 @@ namespace AlternativeSpecialEffects
 
             Action mark = () => { dot.Visibility = Same(Get(f), Saved(f)) ? Visibility.Hidden : Visibility.Visible; UpdateStatus(); UpdateTabDots(); };
             Action refresh;
-            var editor = f.Kind == Kind.Bool ? BoolEditor(f, mark, out refresh) : f.Kind == Kind.Lang ? LangEditor(f, mark, out refresh) : NumberEditor(f, mark, out refresh);
+            var editor = f.Kind == Kind.Bool ? BoolEditor(f, mark, out refresh) : f.Kind == Kind.Lang ? LangEditor(f, mark, out refresh) : f.Kind == Kind.Choice ? ChoiceEditor(f, mark, out refresh) : NumberEditor(f, mark, out refresh);
             Grid.SetColumn(editor, 1);
             g.Children.Add(editor);
 
             string d = Default(f).Replace("True", Loc.T("set.on")).Replace("False", Loc.T("set.off")).Replace("true", Loc.T("set.on")).Replace("false", Loc.T("set.off"));
             if (f.Kind == Kind.Lang) d = Loc.T("set.gameLang");
+            if (f.Kind == Kind.Choice) d = Loc.T("opt." + Default(f));
             var game = new TextBlock { Text = Loc.F("set.default", d) + (f.Game != null ? "\n" + Loc.T("set.gameOff") : ""), Foreground = B(CDim), FontSize = 11f, TextAlignment = TextAlignment.Right,
                                        VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
             Grid.SetColumn(game, 2);
@@ -753,6 +794,23 @@ namespace AlternativeSpecialEffects
             var cb = new CheckBox { IsChecked = Get(f).Trim().Equals("true", StringComparison.OrdinalIgnoreCase), VerticalAlignment = VerticalAlignment.Center };
             cb.Click += (o, e) => { _work[f.Key] = cb.IsChecked == true ? "true" : "false"; mark(); };
             refresh = () => cb.IsChecked = Get(f).Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
+            return cb;
+        }
+
+        static FrameworkElement ChoiceEditor(Field f, Action mark, out Action refresh)
+        {
+            var codes = new List<string>(f.Unit.Split(','));
+            var cb = new ComboBox { Width = 200f, MinHeight = 24f, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+            foreach (var c in codes) cb.Items.Add(Loc.T("opt." + c));
+            Func<int> index = () => { int i = codes.IndexOf((Get(f) ?? "").Trim()); return i < 0 ? 0 : i; };
+            cb.SelectedIndex = index();
+            cb.SelectionChanged += (o, e) =>
+            {
+                int i = cb.SelectedIndex;
+                if (i < 0 || i >= codes.Count || codes[i] == (Get(f) ?? "").Trim()) return;
+                _work[f.Key] = codes[i]; mark();
+            };
+            refresh = () => cb.SelectedIndex = index();
             return cb;
         }
 

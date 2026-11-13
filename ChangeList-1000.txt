@@ -1,6 +1,6 @@
 1.3.0
 - Needs Sea Power 0.9.0 or newer.
 - CIWS and gun hit sound fixes work with the game's new sound system.
-- Gun hit effects by shell size: 10 classes (any gun, also from other mods), each with its own effects and sizes. Set in the Guns tab.
+- Gun hit effects by shell size: 10 classes (any gun, also from other mods), each with its own effects and sizes. Shells also get a different shape and colour by size. Set in the Guns tab.
 - Funnel smoke group "Nuclear (no smoke)" renamed to "Nuclear".
 - "Alternative Mods" menu button works under R.A.T.S. Keel.
