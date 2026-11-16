@@ -37,7 +37,9 @@ namespace AlternativeSpecialEffects
         public static readonly string[] Models = { "game", "tiny", "small", "medium", "large" };
         public static readonly string[] Colors = { "game", "red", "darkred", "yellow", "green", "white" };
         static readonly string[] ModelOf = { "tiny", "small", "medium", "medium", "medium", "medium", "medium", "large", "large", "large" };
-        static readonly string[] ColorOf = { "yellow", "yellow", "darkred", "darkred", "darkred", "darkred", "darkred", "red", "red", "red" };
+        static readonly string[] ColorOf = { "green", "green", "white", "white", "yellow", "yellow", "yellow", "red", "darkred", "darkred" };
+        static readonly float[] SizeOf = { 1.5f, 2f, 0.75f, 1f, 1.25f, 1.5f, 2f, 3.5f, 4f, 4.5f };
+        public static float DefaultSize(int tier) { return SizeOf[tier]; }
         public static string DefaultModel(int tier) { return ModelOf[tier]; }
         public static string DefaultColor(int tier) { return ColorOf[tier]; }
 
@@ -277,6 +279,7 @@ namespace AlternativeSpecialEffects
                 var main = _fWiMain.GetValue(__result) as GameObject; var root = _fWiObj.GetValue(__result) as GameObject;
                 if (main == null || root == null || main.name.IndexOf("shell", StringComparison.OrdinalIgnoreCase) < 0)
                 { Trace("shell look: " + an + " - mesh '" + (main == null ? "none" : main.name) + "' is not a shell mesh, left as it is"); return; }
+                if (main.GetComponent<AseShellSize>() != null) return;   // this instance already has our clone: no second one on top of it
                 int tier = TierOf(st);
                 string model = ShellModel(tier), color = ShellColor(tier);
                 if (model == "game" && color == "game") return;

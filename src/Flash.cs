@@ -15,12 +15,28 @@ namespace AlternativeSpecialEffects
         static int _frame; static float _sumPrev, _sumNext;
         internal static float SumPrev { get { return _sumPrev; } }
         internal static float Budget = 20f;   // the total the flashes may reach together (before FlashPower)
-        void Awake() { _l = GetComponent<Light>(); Alive++; }
-        void OnDestroy() { Alive--; }
+        // Finished flashes are not destroyed but kept switched off and reused (no new GameObject + Light per shot).
+        static readonly Stack<AseFlash> Pool = new Stack<AseFlash>();
+        internal static AseFlash Take()
+        {
+            while (Pool.Count > 0) { var f = Pool.Pop(); if (f != null) return f; }   // a destroyed one (scene change) is skipped
+            var go = new GameObject("AseFlash"); go.SetActive(false);
+            go.AddComponent<Light>().shadows = LightShadows.None;
+            return go.AddComponent<AseFlash>();
+        }
+        void Awake() { _l = GetComponent<Light>(); }
+        void OnEnable() { _t = 0f; Alive++; }
+        void OnDisable() { Alive--; }
+        void Release()
+        {
+            transform.SetParent(null, false);
+            gameObject.SetActive(false);
+            if (Pool.Count < 32) Pool.Push(this); else Destroy(gameObject);
+        }
         void Update()
         {
             _t += Time.deltaTime;
-            if (_t >= Life) { Destroy(gameObject); return; }
+            if (_t >= Life) { Release(); return; }
             if (_l != null)
             {
                 float k = AsePlugin.FlashK(); _l.range = Range * k; float u = _t / Life;
@@ -154,13 +170,15 @@ namespace AlternativeSpecialEffects
                 var cam = Camera.main;
                 if (cam != null && (cam.transform.position - pos).sqrMagnitude > 275f * 275f) return;   // ~ 10 nm (1 unit = 67 m)
                 float k = FlashK();
-                var go = new GameObject("AseFlash");
+                var f = AseFlash.Take();
+                var go = f.gameObject;
                 go.transform.position = pos;
                 if (parent != null) go.transform.SetParent(parent, true);
-                var l = go.AddComponent<Light>();
+                var l = go.GetComponent<Light>();
                 float dk = DayDim();
-                l.type = LightType.Point; l.color = col; l.range = range * k; l.intensity = LimitFlash(peak * k * dk, AseFlash.SumPrev + peak * k * dk); l.shadows = LightShadows.None;
-                var f = go.AddComponent<AseFlash>(); f.Life = life; f.Peak = peak; f.Range = range; f.Hold = hold; f.DayK = dk;
+                l.type = LightType.Point; l.color = col; l.range = range * k; l.intensity = LimitFlash(peak * k * dk, AseFlash.SumPrev + peak * k * dk);
+                f.Life = life; f.Peak = peak; f.Range = range; f.Hold = hold; f.DayK = dk;
+                go.SetActive(true);
             }
             catch (Exception e) { Trace("flash: " + e.Message); }
         }
@@ -191,7 +209,6 @@ namespace AlternativeSpecialEffects
             if (!FlashOn(1)) return;
             try
             {
-                if (!R.B(R.F(__instance, "_isFiring"))) return;
                 float now = Time.time; if (now < _ciwsNext) return;
                 var root = R.F(__instance, "_tracers") as GameObject; if (root == null) return;
                 _ciwsNext = now + 0.12f * UnityEngine.Random.Range(0.7f, 1.3f);

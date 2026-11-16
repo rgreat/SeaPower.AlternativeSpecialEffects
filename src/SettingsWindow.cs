@@ -264,14 +264,6 @@ namespace AlternativeSpecialEffects
             _host = null; _popup = null;
         }
 
-        /// <summary>The .cfg was changed outside the window: the window shows it, unless there are unsaved edits.</summary>
-        public static void Refresh()
-        {
-            if (!IsOpen || P == null || Dirty()) return;
-            Load();
-            Show();
-        }
-
         static void Load()
         {
             _work.Clear();

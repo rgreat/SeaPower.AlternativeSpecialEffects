@@ -1,6 +1,8 @@
-Version 1.3.0.
+Version 1.5.0.
 
 Special effects of the 3D picture in one mod with its own settings window: lights, fires, smoke and guns. Takes over the effects that were spread over Alternative Weapons Control, Alternative Damage Model and the rgreat Cumulative Pack.
+
+[h1]Mod require [b]Anchor Chain[/b] or [b]RATS Keel[/b][/h1]
 
 [h1]Features[/h1]
 [h3]Lights[/h3]
@@ -23,7 +25,7 @@ Special effects of the 3D picture in one mod with its own settings window: light
 
 [h3]Guns[/h3]
 [olist]
-[*][b]More visible gun hit effects[/b] by shell size: 10 classes, each with its own effects and sizes. Applied and removed at once, no restart.
+[*][b]More visible gun hit effects[/b] by shell size: 10 classes, each with its own effects and sizes. Applied and removed at once, no restart. Shells in flight get a shape, colour and size by the same classes.
 [*][b]Machine guns:[/b] tracers and the muzzle burst sound last for the whole burst. Gun hit sound fix.
 [/olist]
 
@@ -42,16 +44,18 @@ Special effects of the 3D picture in one mod with its own settings window: light
 
 [h1]Compatibility[/h1]
 [list]
-[*]Supports Sea Power version 0.9.0 and newer.
-[*]Requires Anchor Chain.
+[*]Supports Sea Power 0.9.2 (0.9.0 and later).
+[*]Loaders: Anchor Chain or RATS Keel (temporarily unavailable).
 [*]Can be switched on/off in the game's Mods menu.
 [*]If you use Alternative Weapons Control, Alternative Damage Model or the rgreat Cumulative Pack, use their latest versions: the moved options are removed from them.
 [/list]
+
 [h1]Install[/h1]
 [olist]
-[*]Install the Anchor Chain preloader as described in the [url=https://seapower-modders.github.io/AnchorChain/install-anchor-chain.html]documentation[/url].
+[*]Subscribe to [url=https://steamcommunity.com/workshop/filedetails/?id=3380210757]Anchor Chain[/url] or [url=https://steamcommunity.com/workshop/filedetails/?id=3835527459]RATS Keel[/url] (temporarily unavailable) and follow instructions on mods page.
 [*]Subscribe to this mod.
-[*]Restart the game.
+[*]Start [b]Sea Power[/b].
+[*]Enable the mod in the game's [b]Mod Manager[/b] and press the [b]Apply[/b] button.
 [/olist]
 
 [h1]Usage[/h1]

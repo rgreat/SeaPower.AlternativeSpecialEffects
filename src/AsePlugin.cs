@@ -24,7 +24,7 @@ namespace AlternativeSpecialEffects
     {
         public const string PluginGuid = "com.rgreat.seapower.alternativespecialeffects";
         public const string PluginName = "Alternative Special Effects";
-        public const string PluginVersion = "1.3.0";
+        public const string PluginVersion = "1.5.0";
 
         public static readonly string BuildId = ReadBuildId();
 
@@ -149,7 +149,7 @@ namespace AlternativeSpecialEffects
             _funnelPowRef = Cfg.Bind("FunnelSmoke", "PowerReference", 50000f, "The horsepower at which the smoke amount is the group's own (not changed by PowerExponent).");
             _funnelGlobalThick = Cfg.Bind("FunnelSmoke", "GlobalThickness", 5f, "Thickness (opacity of the particles) of the funnel smoke of all ships, x of the game's; the groups' own values are multiplied by this. Costs no speed.");
             _funnelShips = Cfg.Bind("FunnelSmoke", "Ships", "usn_cv_forrestal_75=1,1,1.5,1; usn_cv_america_79=1,1,1.5,1; usn_cv_kitty_hawk=1,1,1.5,1", "Single ships: \"ini_name=particles,duration,lightness,thickness; ...\" - multipliers of the group's values of that ship's funnel smoke (particle amount, duration, lightness, thickness; 1 = the group's). Edit them in the Ships tab.");
-            _funnelNations = Cfg.Bind("FunnelSmoke", "Nations", "Soviet=1,1,1,1.5; US=1,0.75,1,0.5; China=1,1,1,1.5", "Countries: \"nation=particles,duration,lightness,thickness; ...\" (Nation= of the ship's ini: US, Soviet, Japan ...) - multipliers of the group's values of the funnel smoke of all ships of the country; multiplied by the ship's own ones (Ships). Edit them in the Nations tab.");
+            _funnelNations = Cfg.Bind("FunnelSmoke", "Nations", "Soviet=1,1,1,1.5; US=1,0.75,1,0.5; China=1,1,1,1.5; UK=1,1,1,1.5", "Countries: \"nation=particles,duration,lightness,thickness; ...\" (Nation= of the ship's ini: US, Soviet, Japan ...) - multipliers of the group's values of the funnel smoke of all ships of the country; multiplied by the ship's own ones (Ships). Edit them in the Nations tab.");
             foreach (var kv in new Dictionary<string, float[]> { { "Diesel", new float[] { 1f, 2f, 25f, 15f, 0.35f, 1.5f, 0.1f, 0.3f } }, { "Steam", new float[] { 0.5f, 1.5f, 30f, 15f, 0.5f, 2f, 0.25f, 0.4f } }, { "GasTurbine", new float[] { 1f, 2f, 50f, 45f, 0.5f, 1f, 0.1f, 0.3f } }, { "Nuclear", new float[] { 0.2f, 0.4f, 80f, 80f, 0f, 0.3f, 0.1f, 0.3f } }, { "Combined", new float[] { 0.5f, 1.5f, 30f, 15f, 0.5f, 2f, 1f, 1f } } })
             {
                 var e = new ConfigEntry<float>[8];
@@ -171,9 +171,9 @@ namespace AlternativeSpecialEffects
             {
                 if (t < HitEffects.Tiers - 1)
                     _hitUp[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "UpToKg", HitEffects.DefaultUp(t), "Class " + (t + 1) + " of the gun hit effects: shells up to this mass, kg (the next class is above). The mass is the ini key General/Mass.");
-                _hitSize[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "ShellSize", 1f, "Class " + (t + 1) + " of the gun hit effects: the size (length) of the shell in flight, x of the size of the ammunition's own model. Takes effect on the next shot.");
-                _hitModel[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "ShellModel", HitEffects.DefaultModel(t), "Class " + (t + 1) + " of the gun hit effects: the shape of the shell in flight: game (the ammunition's own), tiny, small, medium, large. Takes effect on the next shot.");
-                _hitColor[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "ShellColor", HitEffects.DefaultColor(t), "Class " + (t + 1) + " of the gun hit effects: the colour of the shell in flight: game (the ammunition's own), red, darkred, yellow, green, white. Takes effect on the next shot.");
+                _hitSize[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "ShellSize", HitEffects.DefaultSize(t), "Class " + (t + 1) + " of the gun hit effects: the size (length) of the shell in flight, x of the size of the ammunition's own model. Takes effect on the next shot.");
+                _hitModel[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "ShellModel", HitEffects.DefaultModel(t), "Class " + (t + 1) + " of the gun hit effects: the shape of the shell in flight: game (the ammunition's own), tiny, small, medium, large. Takes effect when a mission is loaded.");
+                _hitColor[t] = Cfg.Bind("GunHits", "Class" + (t + 1) + "ShellColor", HitEffects.DefaultColor(t), "Class " + (t + 1) + " of the gun hit effects: the colour of the shell in flight: game (the ammunition's own), red, darkred, yellow, green, white. Takes effect when a mission is loaded.");
                 for (int sl = 0; sl < HitEffects.Slots.Length; sl++)
                     _hitScale[t, sl] = Cfg.Bind("GunHits", "Class" + (t + 1) + HitEffects.Slots[sl], HitEffects.DefaultScale(t, sl), "Class " + (t + 1) + " of the gun hit effects: the size (scale) of the effect " + new[] { "on a ship", "in the air", "on the water", "on the ground" }[sl] + ", x of the effect's own size.");
             }
@@ -242,6 +242,22 @@ namespace AlternativeSpecialEffects
 
         static float Pct(float v, float lo, float hi) { return Math.Max(lo, Math.Min(hi, v)) / 100f; }
 
+        // The Ships / Nations strings are parsed again only when their text changes (the funnel smoke asks for them once a second for every ship).
+        string _nationsRaw, _shipsRaw;
+        Dictionary<string, float[]> _nationsMap, _shipsMap;
+        readonly Dictionary<string, float[]> _groupBuf = new Dictionary<string, float[]>();
+
+        static float[] Multipliers(ConfigEntry<string> entry, ref string raw, ref Dictionary<string, float[]> map, string key)
+        {
+            string now = entry.Value;
+            if (map == null || !string.Equals(raw, now, StringComparison.Ordinal))
+            {
+                raw = now; map = new Dictionary<string, float[]>(StringComparer.OrdinalIgnoreCase);
+                foreach (var it in ShipFunnel.Parse(now)) map[it.Ini] = new[] { it.Particles, it.Duration, it.Lightness, it.Thickness };
+            }
+            float[] v; return key != null && map.TryGetValue(key, out v) ? v : null;
+        }
+
         void WireModules()
         {
             HitEffects.Trace = Trace; HitEffects.Want = () => Enabled && _gunHits.Value;
@@ -253,9 +269,15 @@ namespace AlternativeSpecialEffects
             FireSmoke.FunnelGlobal = () => _funnelGlobal.Value;
             FireSmoke.FunnelGlobalThick = () => _funnelGlobalThick.Value; FireSmoke.FunnelPowerExp = () => _funnelPowExp.Value; FireSmoke.FunnelPowerRef = () => _funnelPowRef.Value; FireSmoke.FunnelSizeExp = () => _funnelSizeExp.Value;
             FireSmoke.FunnelOn = () => Enabled && _funnelOn.Value;
-            FireSmoke.FunnelNation = n => { var l = ShipFunnel.Parse(_funnelNations.Value); foreach (var it in l) if (string.Equals(it.Ini, n, StringComparison.OrdinalIgnoreCase)) return new[] { it.Particles, it.Duration, it.Lightness, it.Thickness }; return null; };
-            FireSmoke.FunnelShip = ini => { var l = ShipFunnel.Parse(_funnelShips.Value); foreach (var it in l) if (string.Equals(it.Ini, ini, StringComparison.OrdinalIgnoreCase)) return new[] { it.Particles, it.Duration, it.Lightness, it.Thickness }; return null; };
-            FireSmoke.FunnelGroup = g => { ConfigEntry<float>[] e; if (!_funnel.TryGetValue(g, out e)) return null; return new[] { e[0].Value, e[1].Value, e[2].Value / 100f, e[3].Value / 100f, e[4].Value, e[5].Value, e[6].Value, e[7].Value }; };
+            FireSmoke.FunnelNation = n => Multipliers(_funnelNations, ref _nationsRaw, ref _nationsMap, n);
+            FireSmoke.FunnelShip = ini => Multipliers(_funnelShips, ref _shipsRaw, ref _shipsMap, ini);
+            FireSmoke.FunnelGroup = g =>
+            {
+                ConfigEntry<float>[] e; if (g == null || !_funnel.TryGetValue(g, out e)) return null;
+                float[] p; if (!_groupBuf.TryGetValue(g, out p)) _groupBuf[g] = p = new float[8];   // read at once by the caller: one buffer a group
+                p[0] = e[0].Value; p[1] = e[1].Value; p[2] = e[2].Value / 100f; p[3] = e[3].Value / 100f; p[4] = e[4].Value; p[5] = e[5].Value; p[6] = e[6].Value; p[7] = e[7].Value;
+                return p;
+            };
             FireSmoke.SortFix = () => Enabled && _smokeSort.Value; FireSmoke.AfterClouds = () => Enabled && _smokeCloud.Value; FireSmoke.KeepOnStop = () => Enabled && _smokeKeep.Value;
             FireSmoke.DensityFactor = () => Enabled ? Math.Max(0f, Math.Min(100f, _smokeDens.Value)) : 1f;
             FireSmoke.LifeFactor = () => Enabled ? Math.Max(1f, Math.Min(100f, _smokeLife.Value)) : 1f;

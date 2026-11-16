@@ -209,10 +209,14 @@ namespace AlternativeSpecialEffects
         }
 
         /// <summary>Every fire effect of a ship, burning or not: the lifetime settings are applied to it (new settings reach burning ships at once).</summary>
+        static readonly float[][] _mine = new float[2][];
+        static FieldInfo[] _fireSets;
+
         static void ProlongAll(object comp)
         {
             var cam = Camera.main; bool sort = (SortFix() || AfterClouds()) && cam != null;
-            foreach (var f in new[] { _small, _moderate, _severe })
+            if (_fireSets == null) _fireSets = new[] { _small, _moderate, _severe };
+            foreach (var f in _fireSets)
             {
                 var arr = f.GetValue(comp) as Array;
                 if (arr != null) foreach (var fe in arr) if (fe != null) { Prolong(fe); Sort(fe, cam, sort); }
@@ -312,6 +316,7 @@ namespace AlternativeSpecialEffects
                     l.Add(new SortSys { R = r, Base = b, Now = b, BaseOrd = r.sortingOrder, NowOrd = r.sortingOrder });
                 }
             }
+            else if (on && !Seq.ContainsKey(l)) { Active.Add(l); Seq[l] = _seq++; }   // dropped when sorting was switched off
             if (!on) Apply(l, false, 0, 0);
         }
 
@@ -405,6 +410,11 @@ namespace AlternativeSpecialEffects
             if (!_skyDumped && Verbose() && cam != null && cam == Camera.main && Time.timeSinceLevelLoad > 5f) DumpSky(cam);
             if (cam != null && cam == Camera.main) CamEffects(cam);
             bool sort = SortFix(), clouds = AfterClouds();
+            if (!(sort || clouds) && Active.Count > 0 && cam != null && cam == Camera.main)
+            {   // sorting was switched off: the game's values back, the lists emptied (Track puts a column back when it is switched on again)
+                foreach (var l in Active) Apply(l, false, 0, 0);
+                Active.Clear(); Seq.Clear();
+            }
             if (cam == null || cam != Camera.main || !(sort || clouds)) return;
             float h0 = 0f, h1 = 0f;
             bool layer = clouds && CloudLayer(out h0, out h1);
@@ -1017,7 +1027,8 @@ namespace AlternativeSpecialEffects
                     float load = group == "Combined" ? BoostLoad(comp) : Load(comp);
                     d = Math.Max(0f, FunnelGlobal()) * Mathf.Lerp(p[0], p[1], load) * Ratio(vp, FunnelPowerExp(), 1f, 2f); b = Mathf.Clamp01(Mathf.Lerp(p[2], p[3], load)); o = Mathf.Clamp(Math.Max(0f, FunnelGlobalThick()) * Mathf.Lerp(p[4], p[5], load), 0f, 100f); om = Mathf.Clamp(Math.Max(0f, FunnelGlobalThick()) * Math.Max(p[4], p[5]), 1e-4f, 100f); k = Mathf.Clamp(Mathf.Lerp(p[6], p[7], load), 0.01f, 1f);
                     float tm = 1f;
-                    foreach (var mine in new[] { FunnelNation(NationOf(vp)), FunnelShip(name) })
+                    _mine[0] = FunnelNation(NationOf(vp)); _mine[1] = FunnelShip(name);
+                    foreach (var mine in _mine)
                         if (mine != null) { d *= mine[0]; k = Mathf.Clamp(k * mine[1], 0.01f, 10f); if (b >= 0f) b = Mathf.Clamp01(b * mine[2]); tm *= mine[3]; }
                     o = Mathf.Clamp(o * tm, 0f, 100f); om = Mathf.Clamp(om * tm, 1e-4f, 100f);
                 }

@@ -134,8 +134,23 @@ namespace AlternativeSpecialEffects
             else if (t < rg[0]) R.SetP(snd, "time", rg[0]);
         }
 
+        static Type _tCiwsF; static FieldInfo _fCiwsFiring;
+
+        /// <summary>The CIWS / machine gun is firing (the game's _isFiring): read through a cached field, so an idle mount costs one field read a frame.</summary>
+        static bool CiwsFiring(object c)
+        {
+            var t = c.GetType();
+            if (!ReferenceEquals(t, _tCiwsF))
+            {
+                _tCiwsF = t;
+                _fCiwsFiring = t.GetField("_isFiring", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            }
+            return _fCiwsFiring == null || (bool)_fCiwsFiring.GetValue(c);   // field not found: as before, everything runs
+        }
+
         static void CiwsUpdate(object __instance)
         {
+            if (!CiwsFiring(__instance)) return;
             try { CiwsSoundLoop(__instance); } catch (Exception e) { Trace("sound loop: " + e.Message); }
             CiwsFlash(__instance);
         }
@@ -193,6 +208,7 @@ namespace AlternativeSpecialEffects
         {
             _donorsDone = true;
             _donors.Clear(); _loopRegion.Clear(); _donorsOwner = null;
+            _added.RemoveWhere(o => (o as UnityEngine.Object) == null);   // sources of effects the game has destroyed (a mission was left)
             var em = UnityEngine.Object.FindObjectOfType(GameAssembly().GetType("SeaPower.EffectsManager"));
             _donorsOwner = em;
             var dict = em == null ? null : R.F(em, "_effectsDictionary") as System.Collections.IDictionary;
