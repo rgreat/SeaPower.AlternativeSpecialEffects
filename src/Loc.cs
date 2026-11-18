@@ -62,6 +62,7 @@ namespace AlternativeSpecialEffects
             D("lbl.Guns/MachineGunSoundLoopFix", "Seamless machine gun sound");
             D("lbl.Guns/HitSoundFix", "Always play gun hit sound");
             D("lbl.General/Debug", "Debug trace");
+            D("lbl.Debug/ScreenshotTabs", "Screenshot all tabs now"); D("btn.run", "Run");
             D("lbl.Effects/ColourGradingNoDepthMask", "Colour grading without the depth mask");
             D("lbl.Debug/CamOffColor", "Off: Amplify Color (colour grading)");
             D("lbl.Debug/CamOffUnderwater", "Off: Ceto water post effect");
