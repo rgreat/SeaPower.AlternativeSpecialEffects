@@ -25,7 +25,7 @@ A Sea Power mod (BepInEx + Anchor Chain or R.A.T.S. Keel) that collects the spec
 
 ## Settings
 
-A settings button in the main menu (under Mod Manager) and in the pause menu (Esc, under Options) opens the settings window. With several of the author's mods installed there is one **Alternative Mods** button that lists them.
+A settings button in the main menu (under Mod Manager) and in the pause menu (Esc, under Options) opens the settings window. With several of the author's mods installed there is one **Alternative Mods** button; it opens the window of the mod used last, and the row of the mods at the top of the window switches between them. The language is one drop-down for all of them.
 The file is `Sea Power_Data/StreamingAssets/user/AlternativeSpecialEffects/AlternativeSpecialEffects.cfg`. On the first start the values of the same options are taken from the old
 Alternative Weapons Control and Alternative Damage Model settings.
 

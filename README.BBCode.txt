@@ -37,7 +37,7 @@ Special effects of the 3D picture in one mod with its own settings window: light
 
 [h3]Settings and languages[/h3]
 [olist]
-[*]Settings window in the game with tabs: Lights, Fires and Smoke, World, Guns, Funnel Smoke (pages General, Engine types, Ships, Countries), Debug, Language. Opens from the main menu (under Mod Manager) and from the pause menu (Esc, under Options). With several of the author's mods installed there is one [b]Alternative Mods[/b] button that lists them.
+[*]Settings window in the game with tabs: Lights, Fires and Smoke, World, Guns, Funnel Smoke (pages General, Engine types, Ships, Countries), Debug; search by option names. Opens from the main menu (under Mod Manager) and from the pause menu (Esc, under Options). With several of the author's mods installed there is one [b]Alternative Mods[/b] button; it opens the window of the mod used last, and the row of the mods at the top of the window switches between them. The language is one drop-down for all of them.
 [*]On the first start the values of the same options are taken from the old Alternative Weapons Control and Alternative Damage Model settings.
 [*]Localized into 9 languages (en, ru, cn, de, es, fr, ko, ja, vn). The [b]lang/<code>.ini[/b] files can be edited to translate or change texts.
 [/olist]
