@@ -1,4 +1,4 @@
-Version 1.5.0.
+Version 1.6.0.
 
 Special effects of the 3D picture in one mod with its own settings window: lights, fires, smoke and guns. Takes over the effects that were spread over Alternative Weapons Control, Alternative Damage Model and the rgreat Cumulative Pack.
 

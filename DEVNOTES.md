@@ -5,6 +5,33 @@ no compile-time dependency on the game's assemblies except Noesis/UnityEngine; g
 
 - Binocular normal view (`[Optics] BinocularsNormalView / NormalViewDayOnly`, Optics.cs) MOVED to Alternative Game Interface (`[Camera] BinocularsNormalView / BinocularsNormalViewDayOnly`, BinocularView.cs).
 
+
+## Как работать с этими заметками (для Claude: не раздувать контекст)
+- Этот файл — только основное (сборка, правила, архитектура, подводные камни). **Не читать целиком чужие разделы**: подробная история функций — в `DEVNOTES-ARCHIVE.md`.
+- Нужная тема: `grep -n "ключевое слово" DEVNOTES-ARCHIVE.md`, затем `sed -n 'N,Mp'` по номерам строк из индекса ниже (читать только этот раздел).
+- Общий код окон настроек (SettingsKit/Hub, вкладки, поиск, Ctrl+C, язык) описан в `seapower.alternativebase/README.md`, не здесь.
+- В чате: большие файлы только через `grep`/`sed -n`/`Read` с offset+limit; логи — `grep`/`tail`, не целиком; вывод команд ограничивать (`| cut -c1-200 | head`).
+- Новые записи: основное — сюда (коротко); подробности и история отладки — в архив, в конец, отдельным разделом.
+
+
+## Состояние релиза
+- 2026-11-19: версия 1.6.0 подготовлена (csproj, PluginVersion, ChangeList.txt, ChangeList-1000.txt = текст Change Log для Steam, README). Не выложена в Steam, пока пользователь не скажет; не закоммичена.
+
+## Индекс архива (строка в DEVNOTES-ARCHIVE.md — раздел; размер в символах)
+- 3 — Sea Power 0.9.0 (distance-sound system) (864)
+- 12 — Settings hub under R.A.T.S. Keel (3876)
+- 21 — Performance review (1.4.0, from reading the code, not profiled) (1393)
+- 29 — Leak review (1.4.0) (545)
+- 32 — Beta 0.9.3-261116b check (1.5.0) (1011)
+- 35 — Settings window: one-line tab strip and screenshots of the tabs (settings kit, after the last r (1129)
+- 38 — Settings window frame and row editors (settings kit: SettingsKit.cs, after the last release) (2467)
+- 46 — Switch between the mods' settings windows (after the last release) (1433)
+- 52 — Tabs, search, revert (kit) (432)
+- 56 — Ctrl+C copies the text under the mouse (kit) (764)
+- 59 — One shared Language (hub + kit) (1056)
+- 62 — Origin of the options: which old mod each option came from (migration by [Section] Key) (1436)
+- 77 — Implementation notes: fire/smoke, funnel smoke, settings pages (the section was called "Planned (7226)
+
 ## Build in the sandbox
 ```
 dotnet build -c Release -p:ManagedDir=/home/claude/seapower.gamefiles/Managed -p:BepInExCore=/home/claude/game/bepinex/BepInEx/core -p:AnchorChainDll=/home/claude/game/ac/AnchorChain.dll
@@ -15,21 +42,6 @@ dotnet build -c Release -p:ManagedDir=/home/claude/seapower.gamefiles/Managed -p
 Replies in Russian, short; no routine boilerplate, no "not tested" disclaimers; no commit/push/release without an explicit command; project source files change only
 on the user's command; mod docs in English; one .cfg switch per feature; events/hooks instead of polling; the mod supports Sea Power 0.9.0 and newer only (no compatibility with older versions);
 sizes in screen pixels; labels must fit their columns; the mod zip keeps the structure (Release/, src/, csproj, docs at the root).
-
-## Origin of the options (names and sections are the same as in the old mods - the migration matches by [Section] Key)
-| Option | From |
-|---|---|
-| Effects: MuzzleFlashLight, HitFlashLight, MissileLaunchFlashLight, FlashPower, FlashLimit, DayBrightness, FireFlicker, FireLightPower | Alternative Weapons Control (AWC) Flash.cs |
-| Guns: MachineGunBurstFix, MachineGunSoundLoopFix, HitSoundFix | AWC GunFixes.cs (only these; AimBeyondMaxRange, MaxAccuracyMeters, fire control stay in AWC) |
-| Effects: ExtraSmokeEmitters, SmokeBySeverity, SmokeStartOpacity, SmokeEndOpacity, SmokeModerateFrom, SmokeSevereFrom | Alternative Damage Model (ADM) FireSmoke.cs |
-| Effects: BubblesStopMinutes | ADM BubblesOff (rewritten) |
-| UI: HideUnobservedTargets3D | ADM |
-| Gun hit effects (47 ammunition files), life raft lights | RgreatCumulativePack |
-
-- Hide unobserved targets (`HideUnseen.Cheating`): not applied while the F10 menu cheat switches are on: `OptionsManager.HideUnidentifiedIn3D` off ("Show Unidentified") or `Globals.AllowControlOfEnemyUnits` on; contacts are re-judged at their next update/scan.
-Not moved (user decision): HidePipScene, ShipModelView, ShowHullCollider, ShowDeckCorners, FireShowsZones, WreckDragFactor, KeepCentreOfMass.
-The old mods still contain these options until the user says to remove them (publish this mod first). Both mods active = the same effect twice (flashes,
-smoke points): remove from the old ones when this mod is released.
 
 ## Source map
 - `AsePlugin.cs` plugin: cfg binds, `Entries` (what the window loads/saves), Mods-menu tick (`ModState`), cfg file watcher, `WireModules`/`ApplySettings`, `TryPatch`.
@@ -73,54 +85,3 @@ The extend rules of the game, for reference (IniHandler): extend files of a targ
 - Remove the moved options from AWC, ADM and the pack (only on the user's command, after this mod is published): the `[Particles]` sections from the pack's 47 files, its life raft files.
 - Check in the game: both menu buttons, window over the main menu and over the pause menu, language switch with the pause menu open, the save/load check from PUBLISHING.md.
 - Help texts of the ADM-origin options are English in all languages (ADM keeps its texts by hash).
-
-## Planned
-- Fire and smoke emitted by one particle system along the whole ship (positions along the hull, by section strength) instead of from the fixed points: per-particle depth sorting then works for the whole plume. `SmokeSortFix` is the stopgap until then.
-
-- Funnel smoke (`FireSmoke.Funnel`, once a second from `Tick`, `[FunnelSmoke]` settings, tab Funnel Smoke): `Vessel.VP._funnelSmoke` (ini `Particles/FunnelSmoke`, 195 ships; the game only plays/stops it). Group = `Vessel._powerSystemInUse.Type` (primary or `[AuxPowerSystem]`; Electric/AIP/None = Nuclear = no smoke) unless `funnel_groups.txt` forces one (`ini_name = Group`; Combined = nuclear + oil-fired boost, wp_rkr_kirov). Load = |`_velocityInKnots`| / `MaxForwardSpeedInKnots`, but 1 (full power) while the ship speeds up (`SpeedCommand.Value.GetDemandedSpeedInKnots` above the real speed by more than max(0.5 kn, 3% of max)). Per group `LifeIdle/LifeFull` multiply `main.startLifetimeMultiplier` (new particles only; maxParticles raised with it); a shorter life keeps the growth speed: the size-over-lifetime curve is cut to its first k part and stretched over the shorter life (`ApplySize`). Note: the size curve is one for all particles of the system, so this re-times it - existing particles take the new curve too when the factor changes (small step each time). Tab Countries (`[FunnelSmoke] Nations`, same format, key = the ship's `_nation` from `VP`; the nations come from `SimpleObjectParameters._defaultNation` of the ships, shown by `LanguageResourceHandler.getText("Nations", key)` (nations.ini: US = USA, Soviet = USSR); multiplied with the ship's own values) and tab Ships (`[FunnelSmoke] Ships` = `ini=particles,duration,lightness,thickness; ...`, `ShipFunnel`, `ShipNames` from ADM): per-ship multipliers of the group's density, duration and lightness, applied in `Funnel` after the group values. Group Combined uses `BoostLoad` instead: 0 up to the full-ahead telegraph speed (0.8 x max, `getSpeedForTelegraph(4)`), 1 at the maximum, so the oil-fired boost smokes only above full speed. Everything is a multiplier of the game's norm: `GlobalThickness` (default 5: the game's funnel smoke is faint; alpha of the particles, costs no speed) x per group `ThicknessIdle/ThicknessFull` (by load), and `GlobalDensity` (default 1: more particles cost speed) x per group density idle/full (`emission.rateOverTimeMultiplier`), brightness idle/full (start colour RGB), `ThicknessIdle/Full` (alpha, 0..5); maxParticles raised with the density); computed from the prefab's own values (`Detached` colour + `Tinted`). The default numbers are estimates (engine type behaviour in general), tune them in the window. Debug dump `funnel smoke of '<ini>'` shows how the prefabs emit.
-
-- Settings window: groups listed in `SettingsWindow.SubGroups` (the five engine groups of Funnel Smoke) are shown one at a time as sub-tabs inside their tab (`_curSub`, `SubTabs`); fields of other groups of the tab stay above.
-
-- Funnel smoke thickness: the funnel smoke material is `Legacy Shaders/Particles/Alpha Blended` with `_TintColor` alpha 0.02 (final alpha = 2 x tint x particle colour), and the particle's own alpha is already 1, so scaling the colours changes nothing. Thickness therefore multiplies `_TintColor` alpha through a per-renderer MaterialPropertyBlock (the material is shared by all ships).
-- Funnel smoke lightness and thickness go through the material's `_TintColor` (per-renderer MaterialPropertyBlock; shader Legacy Alpha Blended: 2 x tint x vertex colour x texture). Lightness (`{Group}LightIdle/LightFull`, %, replaced the old `Bright*` multipliers - a uniform multiplier kept the brownish hue: black -> orange, never white): the smoke's average colour = texture average (alpha-weighted, read once per texture via Graphics.Blit to a 32x32 linear RenderTexture + ReadPixels) x start colour x colorOverLifetime average (alpha-weighted), in the project's colour space; tint per channel = wanted grey / (2 x that), capped at 16, converted back to gamma in linear space. Trace: 'funnel smoke: texture ... average colour', '... smoke colour ..., the game's result ...'. Thickness x tint alpha (_TintColor alpha is only 0.02). The tint is fixed per ship (white, alpha x the group's higher thickness); lightness and thickness by the load go into the START colour of the particles (`main.startColor` x fraction), so a change of the engine mode affects only new particles. Unverified in game.
-- Settings window, tab Funnel Smoke: pages General (grp.funnel), Engine types (the engine groups as sub-tabs), Ships, Countries (`PageOf`, strip `PageTabs`).
-- Funnel smoke particle size by power: z = clamp((hp / PowerReference) ^ SizeByPower, 0.1..4). z > 1 multiplies main.startSizeMultiplier and the size-over-lifetime curve is scaled by lerp(1, 1/z, time) (bigger at the start, the game's size at the end); z < 1 scales the size-over-lifetime curve by lerp(1, z, time) (the module is switched on with a 1 -> z curve when the prefab has none; only a single-curve mode is re-scaled).
-- Fire stage change (`SmokeKeepOnStop`): `Compartments.FireEffect.Deactivate` calls `ParticleSystem.Stop()` = StopEmittingAndClear, which erased the live smoke when a point switched small/moderate/severe or went under water. A transpiler on Deactivate replaces that call with `FireSmoke.StopFire` = `Stop(true, StopEmitting)` (runtime switch). Unverified in game.
-- The random start moment (`Scatter`, pre-run with `Simulate`) was REMOVED; the random seed stays (`FireSmoke.RandomSeed`, every new effect, no pre-run): it gave instant smoke columns on hits/F10 and was glitchy. Do not bring it back.
-- Smoke and clouds (`SmokeAfterClouds`, fires and funnels; the cfg key kept its old name): clouds are one MeshRenderer per sky cell (TurboClouds.buildMesh: km-wide bounds, many billboard quads, queue 3000 like the smoke), Unity sorts a whole cell against a column by the bounds centre - the game's bug. The first fix (smoke material queue = clouds + 1, smoke always after the clouds) was wrong from above the clouds and for far ships: REMOVED, materials keep the game's queue. Now in PreCull every column (fire effect or funnel smoke, `Track`) gets sortingOrder = game's + 1000 x side - rank: side = -1 (behind the clouds) when more of the cloud layer (CloudsManager.getCloudsMinHeight..MaxHeight, looked up lazily) lies on the ray camera -> column (bounds centre) before the column than after it over the same length, else +1; no clouds -> 0. Whole columns vs whole cells, not per pixel. With SmokeAfterClouds off the ranks of SmokeSortFix are compared with the clouds' order 0 too (sortingOrder beats distance in one queue). Unverified in game.
-- Smoke order (`SmokeSortFix`): columns are ranked by the exact distance from the camera to their emitter points (no rounding; equal ones by creation order), rank i - N/2 goes into `sortingOrder` (nearer = higher), set in Camera.onPreCull / beginCameraRendering. History: a sortingFudge compensation by the bounds' centre flickered (noisy bounds); a tie window made the order follow the creation order (bow to stern).
-
-## Sea Power 0.9.0 (distance-sound system)
-- `_info.ini`: `GreaterThanEqualToVersion=0.9.0` (`ApproximateVersion` rejects a newer minor version). Game versions before 0.9.0 are not supported: the fallbacks for them are removed.
-- MachineGunSoundLoopFix: CIWS no longer plays `_sound` (it is disabled); the burst goes through `PlaySoundDistanceBased`, so the loop
-  region is applied to `CIWS._distanceSound.Near`.
-- HitSoundFix: 0.9.0 plays the sources of the effect prefabs itself (`PlayEffectAudio`). Only the AudioSource added by the mod goes through
-  `EffectsManager.PlayWorldSound` (delay by distance, far clip); `_added` remembers them because pooled effects keep the component.
-  The 50-unit minimum range is applied to our source only (the game's sources are already playing when the postfix runs).
-- Not verified in the game, only against the decompile.
-
-## Settings hub under R.A.T.S. Keel
-- Keel starts the mods after `LoadScreen.ExecuteLoadScreen` is over, so the `LoadScreenPostfix` never fires. `SettingsHub.Install` first checks `LoadScreenIsDone` (`Singleton<LoadScreen>.InstanceExists` -> `Instance` -> `LoadText == "Done"`) and, if so, installs the menu entries at once and gives the already built main menu its button. Under Anchor Chain the old path (wait for the end of the coroutine) is unchanged. The canonical copy of `SettingsHub.cs` is here; ADM, AWC and AGI take it unchanged.
-- `Register` ends with `RefreshLabels()`: a mod that registers later than the first one (early start under Keel, so far AGI) refreshes the text of the main menu button and the pause menu buttons that are already there ("Alternative Mods" for two or more active mods, the mod's name for one). Does nothing until the hub is installed (`_game == null`). Copy of the hub is the same in ADM, AWC and AGI.
-- `RefreshLabels()` is called in `Register` and also in `Install`. Reason: every mod's dll has its own copy of the `SettingsHub` class with its own static fields, and the plugin calls `Register(...)` first, then `Install(...)`; so in a later mod's copy `_game` is still null during `Register` and the refresh does nothing. The button put in by the copy of an earlier mod (AGI with `[Keel] StartEarly=true`) gets its text from `Install`, when `_game` is known.
-- Gun hit effects, scale: `Effect._scale` becomes the `localScale` of the spawned root only. A particle system with `scalingMode` Local / Shape ignores the scale of its parents (or scales only its shape), so on a splash the column grew and the spray / mist systems did not. `HitEffects.SpawnPostfix` (postfix of `EffectsManager.spawnEffect`, only for the `Effect` objects the mod manages, the `Managed` table) puts every `ParticleSystem` of the spawned effect into `Hierarchy` while the mod's scale is not 1 and restores its own mode otherwise (the effects are pooled; the originals are in `Origs`). To check in the game: a splash of a 406 mm shell at scale 1.0 must look exactly like the game's; at 0.6 (141-199 mm) the spray must shrink with the column.
-- Gun shell look per class (`HitEffects.WeaponPostfix`, [GunHits] Class<n>ShellModel / ShellColor): postfix of the private `ResourceLoader.loadProjectileResource` (gun shells are `ProjectileInstance`, NOT `WeaponInstance`/`loadWeaponResource`). For a projectile whose `_mainMesh` name contains "shell" (the mass comes from `AmmunitionParameters.GetShared(file)`, not from the ctor notes: the shared master can be built before the mod starts). The shell gets a clone of its own mesh (the game's mesh is a child of a root shared by many ammunition files) and the trace logs one `shell look:` line per ammunition the mesh child is replaced by a clone of `shell_<model>` from the game's own root `weapons/shells/shells_tracer_new` (so it works for mods whose `ResourcesRoot` is another one, e.g. the WW2 mod uses `shell` + `shell_tracer`), and `_material`/the renderer material by `weapons/shells/shell_mat_*`. The weapon instance is cached, so it takes effect when a mission is loaded. Defaults: class 1 tiny/yellow, 2 small/yellow, 3-7 medium/dark red, 8-10 large/red; class 7 limit lowered 110 -> 75 kg so that 6" is medium and 7"+ is large. The GUI has `Kind.Choice` (options in `Field.Unit`, texts `opt.<value>`). Unverified in game: the clone's orientation/scale, `shell_large` in the root.
-
-- 1.4.0: checked against 0.9.2 (Seapower-Scripts.dll of 0.9.0 and 0.9.2 decompiled with the same settings and diffed): every type and member the mod looks up exists, the classes it patches are unchanged, the build against the 0.9.2 Managed folder has no errors. Release/_info.ini has [Keel] StartEarly=true: the settings hub installs the menu entries itself when the load screen is already over. Not tried under Keel in game.
-
-## Performance review (1.4.0, from reading the code, not profiled)
-Done: `CiwsUpdate` runs only while the mount fires (`CiwsFiring`, cached `_isFiring`); the Ships / Nations strings are parsed once per text (`Multipliers` in AsePlugin), `FunnelGroup` reuses a buffer, `ProlongAll` / the funnel lookup allocate no arrays. `Flash()` lights are pooled (`AseFlash.Take` / `Release`, up to 32 kept switched off). Dead `SettingsWindow.Refresh` removed. Not done: `PreCull` trimming.
-Per frame: `CiwsUpdate` (every CIWS / machine gun: ~6 reflection reads through `R.F`/`R.P` with boxing even when idle - gate by `_isFiring` first, cache the fields), `FireSmoke.PreCull` (per camera: `Camera.main` x4, `Renderer.bounds` per smoke column, `Ordered` sort; `Apply` already writes only on a change), `AseFlash`/`AseFireFlicker.Update` (cheap).
-Once a second per ship (`FireSmoke.Tick`): `new[] { _small, _moderate, _severe }`, `ShipFunnel.Parse(...)` of the Ships/Nations strings on every lookup (FunnelNation/FunnelShip delegates in AsePlugin.WireModules) and the `FunnelGroup` array: cache by the setting's string, reuse arrays.
-Per shot/flash: `Flash()` creates a GameObject + Light each time (cap 10 + 8, no shadows, distance cut): pooling would remove the garbage. `PoolPostfix` (reflection + GetComponent per shot) is small.
-Default off: HideUnseen (`Cheating()` reflects on every contact update).
-
-
-## Leak review (1.4.0)
-Static tables are weak (`ConditionalWeakTable`, `WeakReference`) or bounded (per ammo file / texture / ship class). Fixed: `_added` (hit-sound AudioSources) is pruned of destroyed ones in `FindDonors`; the shell clone is not made twice for one `ProjectileInstance`. `Active`/`Seq` (smoke sorting) are emptied in `PreCull` when sorting is switched off. The unparented shell clone (when the root itself is the mesh) is a scene object: freed with the scene unless the game keeps its resources across missions (not verified).
-
-## Beta 0.9.3-261116b check (1.5.0)
-Built against the beta Managed folder: 0 errors. Only Seapower-Scripts.dll and AstarPathfindingProject.dll changed; the classes ASE patches or reads (Compartments, CIWS, EffectsManager, GunBarrel, ResourceLoader, ProjectileManager/Instance, HideUnseen's sensor and Vehicle types, CameraManager, LoadScreen, MainMenuView) are identical. Changed: Projectile.ProcessCollision (damage maths only: ASE's prefix only notes the projectile), AmmunitionParameters (two new fields and ini keys, the constructor signature is the same), WeaponBase.CreateDesctructionEffects and Missile.ScheduleFlightEffects (log line numbers only), MissileSimulator.GetAccelerationTimes (same signature; ASE looks it up by argument types, not by the renamed Burst wrappers). Missile wobble moves only the mesh, colliders and afterburner under `NoseUpVisualPivot`; ASE's missile light is parented to the missile root, so it does not wobble. All member names ASE looks up by reflection exist in the beta.
-
-## Settings window: one-line tab strip and screenshots of the tabs (settings kit, after the last release, not committed)
-The tabs of the settings window are one line: `TabScroll` (src/TabScroll.cs, shared by all rgreat mods) puts the panel of tabs into a ScrollViewer without bars, arrow buttons ◀ ▶ at both ends are visible only while the tabs do not fit, the wheel over the strip scrolls it, and the chosen tab is kept in view (`Reveal`: when it is chosen, when the window gets smaller, when the arrows appear or go). Debug tab, "Screenshot all tabs now" (a button, `Kind.Action`): `SettingsShots.Run` (src/SettingsShotKit.cs, shared) goes through every tab (and every page of the Funnel Smoke tab), fits the window to the tab (largest, then the width of the widest row, then the height of the options) and writes the PNG files to BepInEx/AlternativeSpecialEffects_screens; `ShotAdapter` in SettingsWindow.cs is this mod's `IShotWindow`. TabScroll.cs and SettingsShotKit.cs are copies of the files in the SeaPower.AlternativeBase repository (sibling folder; tools/sync.sh copies them to the mods): change them there, not here.

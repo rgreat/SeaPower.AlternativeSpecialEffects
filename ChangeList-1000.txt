@@ -1,4 +1,7 @@
-1.5.0
-- Loaders: Anchor Chain or R.A.T.S. Keel. Keel is temporarily unavailable, so use Anchor Chain for now. See Install in the README.
-- Less load in battles: CIWS and machine guns, funnel smoke and gun flashes now use noticeably less CPU.
-- Fixed memory use growing over a long game session.
+1.6.0
+- One settings window for all four Alternative mods:
+  - Find any option by typing its name in the search box.
+  - Switch between the mods' settings with one click; your edits are kept.
+  - Choose the language once for all mods.
+  - Undo changes you have not applied yet.
+- About 170 settings texts that were in English are now translated into all languages.

@@ -40,9 +40,15 @@ namespace AlternativeSpecialEffects
             D("set.hint", "Point at a setting to see what it does.");
             D("set.cancel", "Cancel"); D("set.apply", "Apply"); D("set.ok", "OK");
             D("set.changed", "● changed, not applied yet   ↺ = back to the default");
+            D("set.clean", "↺ = back to the default");
+            D("set.search", "Search...");
+            D("set.nothing", "Nothing found.");
+            D("set.revertTab", "Take back the edits of this tab that are not applied yet");
+            D("set.revertGroup", "Take back the edits of this group that are not applied yet");
             D("set.default", "default: {0}"); D("set.on", "on"); D("set.off", "off");
             D("set.gameOff", "game: off");
             D("set.gameLang", "the game's language");
+            D("lang.default", "Default"); D("lang.caption", "Language");
             D("set.resetTip", "Back to the default");
             D("set.resizeTip", "Drag to resize");
             D("tabs.lights", "Lights"); D("tabs.fires", "Fires and Smoke"); D("tabs.world", "Sinking and view"); D("tabs.guns", "Guns");
@@ -198,6 +204,9 @@ namespace AlternativeSpecialEffects
         }
 
         public static string Language { get { Check(); return _lang; } }
+
+        /// <summary>The language setting changed: the next text is read in the new language.</summary>
+        public static void Refresh() { _checkedAt = -1; }
 
         static bool _checking;
 

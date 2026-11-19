@@ -24,7 +24,7 @@ namespace AlternativeSpecialEffects
     {
         public const string PluginGuid = "com.rgreat.seapower.alternativespecialeffects";
         public const string PluginName = "Alternative Special Effects";
-        public const string PluginVersion = "1.5.0";
+        public const string PluginVersion = "1.6.0";
 
         public static readonly string BuildId = ReadBuildId();
 
@@ -147,9 +147,9 @@ namespace AlternativeSpecialEffects
             _funnelPowExp = Cfg.Bind("FunnelSmoke", "PowerExponent", 0.5f, "Smoke amount by the engines' power: x (horsepower / PowerReference) ^ this, limited to 1..2: a small ship keeps the game's amount, a large one gets up to twice as much. 0 = the game's amount for every ship.");
             _funnelSizeExp = Cfg.Bind("FunnelSmoke", "SizeByPower", 1f, "Size of the smoke particles by the engines' power: x (horsepower / PowerReference) ^ this. A larger ship gets bigger particles at the start, a smaller one smaller particles at the end of their life. 0 = the game's size.");
             _funnelPowRef = Cfg.Bind("FunnelSmoke", "PowerReference", 50000f, "The horsepower at which the smoke amount is the group's own (not changed by PowerExponent).");
-            _funnelGlobalThick = Cfg.Bind("FunnelSmoke", "GlobalThickness", 5f, "Thickness (opacity of the particles) of the funnel smoke of all ships, x of the game's; the groups' own values are multiplied by this. Costs no speed.");
+            _funnelGlobalThick = Cfg.Bind("FunnelSmoke", "GlobalThickness", 8f, "Thickness (opacity of the particles) of the funnel smoke of all ships, x of the game's; the groups' own values are multiplied by this. Costs no speed.");
             _funnelShips = Cfg.Bind("FunnelSmoke", "Ships", "usn_cv_forrestal_75=1,1,1.5,1; usn_cv_america_79=1,1,1.5,1; usn_cv_kitty_hawk=1,1,1.5,1", "Single ships: \"ini_name=particles,duration,lightness,thickness; ...\" - multipliers of the group's values of that ship's funnel smoke (particle amount, duration, lightness, thickness; 1 = the group's). Edit them in the Ships tab.");
-            _funnelNations = Cfg.Bind("FunnelSmoke", "Nations", "Soviet=1,1,1,1.5; US=1,0.75,1,0.5; China=1,1,1,1.5; UK=1,1,1,1.5", "Countries: \"nation=particles,duration,lightness,thickness; ...\" (Nation= of the ship's ini: US, Soviet, Japan ...) - multipliers of the group's values of the funnel smoke of all ships of the country; multiplied by the ship's own ones (Ships). Edit them in the Nations tab.");
+            _funnelNations = Cfg.Bind("FunnelSmoke", "Nations", "US=1,0.75,1,0.5", "Countries: \"nation=particles,duration,lightness,thickness; ...\" (Nation= of the ship's ini: US, Soviet, Japan ...) - multipliers of the group's values of the funnel smoke of all ships of the country; multiplied by the ship's own ones (Ships). Edit them in the Nations tab.");
             foreach (var kv in new Dictionary<string, float[]> { { "Diesel", new float[] { 1f, 2f, 25f, 15f, 0.35f, 1.5f, 0.1f, 0.3f } }, { "Steam", new float[] { 0.5f, 1.5f, 30f, 15f, 0.5f, 2f, 0.25f, 0.4f } }, { "GasTurbine", new float[] { 1f, 2f, 50f, 45f, 0.5f, 1f, 0.1f, 0.3f } }, { "Nuclear", new float[] { 0.2f, 0.4f, 80f, 80f, 0f, 0.3f, 0.1f, 0.3f } }, { "Combined", new float[] { 0.5f, 1.5f, 30f, 15f, 0.5f, 2f, 1f, 1f } } })
             {
                 var e = new ConfigEntry<float>[8];
@@ -205,6 +205,7 @@ namespace AlternativeSpecialEffects
                 Entries.Add(en);
 
             Loc.Trace = Trace; Loc.Forced = () => _language == null ? "" : _language.Value;
+            Rgreat.Hub.SettingsHub.JoinLanguage(_language.Value, v => { _language.Value = v; Loc.Refresh(); });   // one language for all the rgreat mods
             Entries.Add(_funnelOn); Entries.Add(_funnelGlobal); Entries.Add(_funnelGlobalThick); Entries.Add(_funnelPowExp); Entries.Add(_funnelPowRef); Entries.Add(_funnelSizeExp); Entries.Add(_funnelShips); Entries.Add(_funnelNations);
             foreach (var e in _hitUp) if (e != null) Entries.Add(e);
             foreach (var e in _hitScale) Entries.Add(e);
@@ -389,7 +390,8 @@ namespace AlternativeSpecialEffects
             try
             {
                 Rgreat.Hub.SettingsHub.Register("alternative-special-effects", () => Loc.T("menu.button"), PluginVersion, 40,
-                    anchor => SettingsWindow.Open(anchor as Noesis.UIElement, null), () => Enabled);
+                    anchor => SettingsWindow.Open(anchor as Noesis.UIElement, null), () => Enabled,
+                    SettingsWindow.IsDirty, SettingsWindow.CommitKept, SettingsWindow.DiscardKept, SettingsWindow.Hide, SettingsWindow.Kept, SettingsWindow.ShotsRun);
                 Rgreat.Hub.SettingsHub.Install(harmony, asm, Trace, () => Loc.Language);
             }
             catch (Exception e) { Warn("Settings menu entry failed: " + e.Message); Trace(e.ToString()); }

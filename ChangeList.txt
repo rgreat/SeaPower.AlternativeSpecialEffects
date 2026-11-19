@@ -1,3 +1,13 @@
+1.6.0
+- Settings window (the same window and rules in all four Alternative mods):
+  - One-line tab strip with arrows; the mouse wheel scrolls it.
+  - Search box: finds options by their names (not by descriptions); the X clears it; the text stays when you switch to another mod's window.
+  - The row of the installed mods at the top of the window: a click opens that mod's window (the edits are kept). Language is now one drop-down at its right for all mods ("Default" = the game's language).
+  - Ctrl+C copies the help text of the option under the mouse.
+  - The settings window opens on the mod used last (menu button; the gear of the World View window).
+- Debug: "Screenshot all tabs now" (all installed Alternative mods, BepInEx/<Mod>_screens).
+- About 170 texts (smoke, funnel smoke, sinking, hiding of targets, debug) were English in most languages: translated into all 8. Game terms are written as in the game's own language files.
+
 1.5.0
 - Loaders: Anchor Chain or R.A.T.S. Keel. Keel is temporarily unavailable, so use Anchor Chain for now. See Install in the README.
 - Less load in battles: CIWS and machine guns, funnel smoke and gun flashes now use noticeably less CPU.
