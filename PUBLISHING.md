@@ -1,5 +1,7 @@
 # Alternative Special Effects: build, check, publish
 
+> Preparing a release (version, change lists, README, translations, build, commit rules)? Read the Sea Power project doc `claude/release-howto.md` first (also: `claude/steam-workshop.md` for the Workshop ids and how to check what is published).
+
 ## Layout
 ```
 AlternativeSpecialEffects.csproj   build; after Build the dll is copied to Release
