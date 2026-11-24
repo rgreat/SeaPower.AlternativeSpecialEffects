@@ -1,8 +1,8 @@
-Version 1.6.0.
+Version 1.6.1.
 
 Special effects of the 3D picture in one mod with its own settings window: lights, fires, smoke and guns. Takes over the effects that were spread over Alternative Weapons Control, Alternative Damage Model and the rgreat Cumulative Pack.
 
-[h1]Mod require [b]Anchor Chain[/b] or [b]RATS Keel[/b][/h1]
+[h1]Mod require [b]RATS Keel[/b] or [b]Anchor Chain[/b][/h1]
 
 [h1]Features[/h1]
 [h3]Lights[/h3]
@@ -37,7 +37,7 @@ Special effects of the 3D picture in one mod with its own settings window: light
 
 [h3]Settings and languages[/h3]
 [olist]
-[*]Settings window in the game with tabs: Lights, Fires and Smoke, World, Guns, Funnel Smoke (pages General, Engine types, Ships, Countries), Debug; search by option names. Opens from the main menu (under Mod Manager) and from the pause menu (Esc, under Options). With several of the author's mods installed there is one [b]Alternative Mods[/b] button; it opens the window of the mod used last, and the row of the mods at the top of the window switches between them. The language is one drop-down for all of them.
+[*]Settings window in the game with tabs: Lights, Fires and Smoke, World, Guns, Funnel Smoke (pages General, Engine types, Ships, Countries), Debug; search by option names. Opens from the main menu (under Mod Manager) and from the pause menu (Esc, under Options). With several Alternative mods installed there is one [b]Alternative Mods[/b] button; it opens the window of the mod used last, and the row of the mods at the top of the window switches between them. The language is one drop-down for all of them.
 [*]On the first start the values of the same options are taken from the old Alternative Weapons Control and Alternative Damage Model settings.
 [*]Localized into 9 languages (en, ru, cn, de, es, fr, ko, ja, vn). The [b]lang/<code>.ini[/b] files can be edited to translate or change texts.
 [/olist]
@@ -45,14 +45,14 @@ Special effects of the 3D picture in one mod with its own settings window: light
 [h1]Compatibility[/h1]
 [list]
 [*]Supports Sea Power 0.9.2 (0.9.0 and later).
-[*]Loaders: Anchor Chain or RATS Keel (temporarily unavailable).
+[*]Loaders: RATS Keel or Anchor Chain.
 [*]Can be switched on/off in the game's Mods menu.
 [*]If you use Alternative Weapons Control, Alternative Damage Model or the rgreat Cumulative Pack, use their latest versions: the moved options are removed from them.
 [/list]
 
 [h1]Install[/h1]
 [olist]
-[*]Subscribe to [url=https://steamcommunity.com/workshop/filedetails/?id=3380210757]Anchor Chain[/url] or [url=https://steamcommunity.com/workshop/filedetails/?id=3835527459]RATS Keel[/url] (temporarily unavailable) and follow instructions on mods page.
+[*]Subscribe to [url=https://steamcommunity.com/workshop/filedetails/?id=3835527459]RATS Keel[/url] or [url=https://steamcommunity.com/workshop/filedetails/?id=3380210757]Anchor Chain[/url] and follow instructions on mods page.
 [*]Subscribe to this mod.
 [*]Start [b]Sea Power[/b].
 [*]Enable the mod in the game's [b]Mod Manager[/b] and press the [b]Apply[/b] button.

@@ -967,7 +967,7 @@ namespace AlternativeSpecialEffects
         sealed class FSys { public object Ps; public float Rate; public int Max; public object Col, LifeCol; public Renderer Rend; public Color Tint, Work; public bool HasTint; public float Size = 1f, Life = 1f, SzMult = 1f; public Keyframe[] SzKeys; public bool SzOn, SzOk; }
         sealed class FState { public List<FSys> S = new List<FSys>(); public float D = -1f, B = -1f, O = -1f, Z = -1f, Om = -1f, K = -1f; }
         static readonly ConditionalWeakTable<object, FState> Funnels = new ConditionalWeakTable<object, FState>();
-        static FieldInfo _cVessel, _vInUse, _vVel; static PropertyInfo _vMaxSpeed, _psType, _eRate, _eRateDummy; static PropertyInfo _lEm2, _lRate2;
+        static FieldInfo _cVessel, _vInUse, _vVel; static PropertyInfo _vMaxSpeed, _psType; static PropertyInfo _lEm2, _lRate2;
         static Dictionary<string, string> _forced;
         static PropertyInfo _maxP;
         static PropertyInfo _lMaxP() { return _maxP ?? (_maxP = _psMain.PropertyType.GetProperty("maxParticles")); }
@@ -1264,13 +1264,6 @@ namespace AlternativeSpecialEffects
         {
             try { var b = BaseLifeColour(ps); return b == null ? "-" : Alpha(b).ToString("0.##", CultureInfo.InvariantCulture); } catch { return "?"; }
         }
-
-        static void SetLifeColour(object ps, object col)
-        {
-            var m = _colLife.GetValue(ps, null);
-            _colLifeCol.SetValue(m, col, null);
-        }
-
         /// <summary>The group of a ship: the type of the power system in use (a combined plant switches), Electric / AIP / None count as no smoke (Nuclear).</summary>
         static string GroupOf(object comp)
         {
@@ -1357,18 +1350,6 @@ namespace AlternativeSpecialEffects
                 return Mathf.Clamp01((speed - full) / Math.Max(0.01f, max - full));
             }
             catch { return 0f; }
-        }
-
-        /// <summary>The start colour with its colour channels x rgb (clamped) and alpha x a, from the colour as the prefab made it.</summary>
-        static object Tinted(object grad, float rgb, float a)
-        {
-            int mode = Convert.ToInt32(_gradMode.GetValue(grad, null));
-            object g2 = CopyStruct(grad);
-            if (mode == 0) _gradColor.SetValue(g2, Tint((Color)_gradColor.GetValue(grad, null), rgb, a), null);
-            else if (mode == 2 && _gradMin != null && _gradMax != null) { _gradMin.SetValue(g2, Tint((Color)_gradMin.GetValue(grad, null), rgb, a), null); _gradMax.SetValue(g2, Tint((Color)_gradMax.GetValue(grad, null), rgb, a), null); }
-            else if (mode == 1 && _gradG != null) _gradG.SetValue(g2, Tint(_gradG.GetValue(grad, null) as Gradient, rgb, a), null);
-            else if (mode == 3 && _gradGMin != null && _gradGMax != null) { _gradGMin.SetValue(g2, Tint(_gradGMin.GetValue(grad, null) as Gradient, rgb, a), null); _gradGMax.SetValue(g2, Tint(_gradGMax.GetValue(grad, null) as Gradient, rgb, a), null); }
-            return g2;
         }
 
         static Color Tint(Color c, float rgb, float a) { return new Color(Mathf.Clamp01(c.r * rgb), Mathf.Clamp01(c.g * rgb), Mathf.Clamp01(c.b * rgb), Mathf.Clamp01(c.a * a)); }

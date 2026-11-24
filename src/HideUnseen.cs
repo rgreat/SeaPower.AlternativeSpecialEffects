@@ -162,7 +162,16 @@ namespace AlternativeSpecialEffects
         /// The cheat switches of the F10 menu win over this option: "Show Unidentified" (the game's own HideUnidentifiedIn3D is off) or "Control Enemy Units".
         /// Every contact is then drawn; it is judged again at its next update, so nothing is polled.
         /// </summary>
+        static int _cheatFrame = -1; static bool _cheat;
+
         static bool Cheating()
+        {
+            if (Time.frameCount == _cheatFrame) return _cheat;   // many contacts update in one frame: the two switches are read once a frame
+            _cheatFrame = Time.frameCount; _cheat = ReadCheats();
+            return _cheat;
+        }
+
+        static bool ReadCheats()
         {
             try
             {
@@ -332,14 +341,6 @@ namespace AlternativeSpecialEffects
             catch (Exception e) { Trace("HideUnseen towed: " + e.Message); }
             return result;
         }
-
-        static Renderer[] Merge(Renderer[] a, List<Renderer> b)
-        {
-            if (b.Count == 0) return a;
-            var all = new List<Renderer>(a); all.AddRange(b);
-            return all.ToArray();
-        }
-
         static void Apply(Component obj, Hidden h, bool visible)
         {
             if (h.On == visible) return;

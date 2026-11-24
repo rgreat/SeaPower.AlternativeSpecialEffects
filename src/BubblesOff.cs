@@ -104,8 +104,6 @@ namespace AlternativeSpecialEffects
             foreach (var ps in t.GetComponentsInChildren(_tPs)) { _mStop.Invoke(ps, new object[] { false, stopEmitting }); n++; }
             return n;
         }
-
-        internal static bool Ready { get { return _ok; } }
         internal static double GameNow() { return Now(); }
         internal static float MinutesNow() { return IsEnabled() ? Minutes() : 0f; }
         internal static void Log(string s) { Trace(s); }

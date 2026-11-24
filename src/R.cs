@@ -47,13 +47,6 @@ namespace AlternativeSpecialEffects
             if (o == null) return null;
             try { var f = Fi(o.GetType(), n); return f == null ? null : f.GetValue(o); } catch { return null; }
         }
-
-        public static void SetF(object o, string n, object v)
-        {
-            if (o == null) return;
-            try { var f = Fi(o.GetType(), n); if (f != null) f.SetValue(o, v); } catch { }
-        }
-
         public static object P(object o, string n)
         {
             if (o == null) return null;
@@ -65,18 +58,6 @@ namespace AlternativeSpecialEffects
             if (o == null) return;
             try { var p = Pi(o.GetType(), n); if (p != null) p.SetValue(o, v, null); } catch { }
         }
-
-        /// <summary>A field or a property.</summary>
-        public static object V(object o, string n)
-        {
-            if (o == null) return null;
-            var f = Fi(o.GetType(), n);
-            if (f != null) { try { return f.GetValue(o); } catch { return null; } }
-            return P(o, n);
-        }
-
-        /// <summary>Value of a ReactiveProperty-like object (its Value property), or the object itself.</summary>
-        public static object Rv(object o) { var v = P(o, "Value"); return v ?? o; }
 
         /// <summary>Calls a method by name: the overload whose parameters take the arguments; missing trailing ones get their defaults.</summary>
         public static object Call(object o, string n, params object[] args)
@@ -120,6 +101,5 @@ namespace AlternativeSpecialEffects
         public static int I(object v) { try { return v == null ? 0 : Convert.ToInt32(v, CultureInfo.InvariantCulture); } catch { return 0; } }
         public static float Fl(object v) { try { return v == null ? 0f : Convert.ToSingle(v, CultureInfo.InvariantCulture); } catch { return 0f; } }
         public static string S(object v) { return v == null ? null : v as string ?? v.ToString(); }
-        public static bool Is(object o, Type t) { return o != null && t != null && t.IsInstanceOfType(o); }
     }
 }

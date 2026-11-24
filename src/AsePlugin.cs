@@ -24,7 +24,7 @@ namespace AlternativeSpecialEffects
     {
         public const string PluginGuid = "com.rgreat.seapower.alternativespecialeffects";
         public const string PluginName = "Alternative Special Effects";
-        public const string PluginVersion = "1.6.0";
+        public const string PluginVersion = "1.6.1";
 
         public static readonly string BuildId = ReadBuildId();
 
@@ -76,6 +76,7 @@ namespace AlternativeSpecialEffects
             catch { }
         }
 
+        internal static void TraceLine(string msg) { Trace(msg); }
         internal static void Say(string msg) { if (_inst != null) _inst.Logger.LogInfo(msg); }
         static void Warn(string msg) { if (_inst != null) _inst.Logger.LogWarning(msg); Trace("WARN " + msg); }
 
@@ -362,6 +363,7 @@ namespace AlternativeSpecialEffects
             var harmony = new Harmony(PluginGuid);
             const BindingFlags all = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
             try { HookFireFlicker(harmony, asm); } catch (Exception e) { Warn("Fire flicker failed: " + e.Message); }
+            try { if (!RelocationGuard.Init(harmony, asm)) Warn("Relocation guard: game members not found."); } catch (Exception e) { Warn("Relocation guard failed: " + e.Message); }
             try { if (!HitEffects.Init(harmony, asm)) Warn("Gun hit effects: game members not found; the game's own hit effects stay."); } catch (Exception e) { Warn("Gun hit effects failed: " + e.Message); }
             try { if (!RaftLights.Init(harmony, asm)) Warn("Life raft lights: game members not found; the lights cannot be switched."); } catch (Exception e) { Warn("Life raft lights failed: " + e.Message); }
             try { HookEffectsGuns(harmony, asm); } catch (Exception e) { Warn("Gun effects failed: " + e.Message); }

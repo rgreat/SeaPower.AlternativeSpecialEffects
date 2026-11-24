@@ -1,3 +1,7 @@
+1.6.1
+- Fixed: part of the terrain could be missing after a mission was started again (a destroyed effect in the game's relocation list stopped the ground from being shifted; such entries are now dropped before the shift).
+- Unused code removed; the hiding of unseen targets reads the F10 cheat switches once a frame instead of once per contact update.
+
 1.6.0
 - Settings window (the same window and rules in all four Alternative mods):
   - One-line tab strip with arrows; the mouse wheel scrolls it.

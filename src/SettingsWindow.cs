@@ -168,7 +168,7 @@ namespace AlternativeSpecialEffects
         }
 
         // ------------------------------------------------------------ colours (the game's dark panels)
-        static readonly Color CBg = WinStyle.Bg, CCard = WinStyle.Card, CLine = WinStyle.Line, CText = WinStyle.Text, CDim = WinStyle.Dim,
+        static readonly Color CLine = WinStyle.Line, CText = WinStyle.Text, CDim = WinStyle.Dim,
                               CWarn = WinStyle.Warn, CTitle = WinStyle.Title, CField = WinStyle.Field, CHl = WinStyle.Hl;
 
         static SolidColorBrush B(Color c) { return WinStyle.B(c); }

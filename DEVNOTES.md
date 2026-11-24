@@ -85,3 +85,12 @@ The extend rules of the game, for reference (IniHandler): extend files of a targ
 - Remove the moved options from AWC, ADM and the pack (only on the user's command, after this mod is published): the `[Particles]` sections from the pack's 47 files, its life raft files.
 - Check in the game: both menu buttons, window over the main menu and over the pause menu, language switch with the pause menu open, the save/load check from PUBLISHING.md.
 - Help texts of the ADM-origin options are English in all languages (ADM keeps its texts by hash).
+
+## Clean-up and review (1.6.0, prepared)
+Removed unused code: `R.SetF`, `R.V`, `R.Rv`, `R.Is`, `BubblesOff.Ready`, `FireSmoke.SetLifeColour`, `FireSmoke.Tinted`, `HideUnseen.Merge`, two unused reflection fields (`_eRate`, `_eRateDummy`) and an unused colour constant in the settings window. No unused language keys (keys of the ten gun hit classes are built from the class number). HideUnseen reads the two F10 cheat switches once per frame instead of once per contact update. Review: no new leaks (static tables are weak or bounded, pools capped), no per-frame allocations in the hot paths (`PreCull`, `CiwsUpdate`, flash and flicker updates); the remaining `FindObjectOfType` calls are cached or in the debug dump. Compatibility: see the beta 0.9.3 check above; the compiler warnings left are the game's/Unity's deprecated `FindObjectOfType` and an unassigned field of the shared kit.
+
+## Release state
+1.6.1: prepared, not published (Steam has 1.6.0 from Nov 18, seen on the cache-busted item page 2026-11-22; a first look at the change log showed a stale 1.5.0). Change lists, READMEs and version are changed everywhere. Re-checked 2026-11-23: Steam change log still ends at 1.6.0; build 0 errors, zip = working tree (src/RelocationGuard.cs is new and uncommitted). Nothing committed.
+
+## Relocation guard (1.6.1)
+Bug report: after a mission restart part of the terrain is not drawn; log: NullReferenceException in `EffectsManager.relocate` (`item.transform` of a destroyed GameObject in `_activeEffectsForRelocation`). `RelocationHandler.relocate` aborts there, `TerrainManager.relocateChunks` (next in order) never runs. ASE never touches that list; the source of the dead entry is not proven (the object count grows between missions). `src/RelocationGuard.cs`: Harmony prefix on `EffectsManager.relocate` removes null entries and writes one trace line with the count. If the trace never shows the line with ASE alone, the cause is another mod or the game.

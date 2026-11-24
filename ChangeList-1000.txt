@@ -1,7 +1,3 @@
-1.6.0
-- One settings window for all four Alternative mods:
-  - Find any option by typing its name in the search box.
-  - Switch between the mods' settings with one click; your edits are kept.
-  - Choose the language once for all mods.
-  - Undo changes you have not applied yet.
-- About 170 settings texts that were in English are now translated into all languages.
+1.6.1
+- Fixed: part of the terrain could be missing after a mission was started again.
+- Internal clean-up; slightly less CPU load when unseen targets are hidden.
